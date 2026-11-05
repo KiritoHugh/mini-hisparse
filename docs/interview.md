@@ -1,4 +1,94 @@
-# 用项目回答面试题
+# 面试三问：直接回答与实现证据
+
+以下先按题目给出操作规则。字段、公式证明、实验和追问放在文末可展开的附录。
+
+## 问题一：如何记录 KV 页的位置，并完成驻留、卸载和临时加载之间的状态转换？
+
+**给每个逻辑页维护 host/GPU 两套位置；卸载时保留 host 位置，GPU block 真正被复用时清除 GPU 位置；再次需要它时，只把选中的 rows 放进 hot slots，加载完成后再交给 attention。**
+
+页表至少回答四件事：这是谁的哪一页、host 副本在哪、是否还有有效 GPU 驻留位置、最新 host 副本是否已写完。Hot 另有一张内容表，记录每个 slot 装的是哪条 host row。
+
+| 发生什么 | 具体操作 | 什么时候允许下一步 |
+|---|---|---|
+| 产生新 KV | 写到 GPU tail，并将新增 rows 异步镜像到 host | GPU 写入完成后才能开始镜像 |
+| 显存紧张，要卸载历史页 | 先确认最新 host 镜像完成；合格历史页标记为可回收 | 未完成 D2H、仍在被读、属于最后两页的页不能回收 |
+| allocator 真正取走这个 block | 撤销旧 GPU 页表项，保留 host 页表项，再将 block 给新 owner | 新内容覆盖前还要尊重旧 GPU 读者的完成事件 |
+| decode 再选中这页中的 token | GPU 页表命中则直接读；否则查 hot，hot 也 miss 才从 host 加载对应 rows | 加载完成事件到达后，attention 才能读 |
+| 后续步骤需要其它 rows | 保留本步正在用的 hot slots，其余可替换 | 上一次 attention 读完后才能覆盖 |
+
+例如一页原来在 `GPU block 6`，host 副本在 `host block 23`。卸载后，host 23 不变，resident 项在 block 6 被复用时变成 `-1`。之后只选中该页两条 rows，就只加载这两条到 hot；无需恢复整页，更无需恢复整个请求。
+
+这里有两个状态必须分清：**“可回收”仍可能 resident hit；“已加载到 hot”也不表示整页重新 resident。** 所以页面状态与 hot row 内容分别管理。[状态图与具体地址](visual-guide.md)。
+
+## 问题二：共享显存池时，驱逐哪些页、预留多少 hot 空间？
+
+**先为每个已准入请求保证“本步选择并集能装下”的 hot 容量和两页 tail，剩余容量用于 resident history。空间不够时先用空 block，再回收可安全覆盖的历史页。**
+
+### 预留多少：按单步选择并集计算
+
+设每层单步最多选中 `U` 个不同 tokens，page size 为 `P`，层数为 `L`：
+
+```text
+最低 hot rows H = U
+项目默认 hot rows H = 2U，给跨步复用留余量
+每请求必须承诺的 blocks = L * (ceil(H/P) + 2)
+```
+
+例如 `U=32、P=16、L=2`：最低配额为 8 blocks；默认 `H=64` 时为 12 blocks。**不足这个承诺就让新请求等待，不能先准入，再指望它恢复完整 KV 后才能 decode。** Host 与索引预算也要检查。
+
+预留的是容量信用，hot blocks 尚未分配时 resident history 可以借用。低水位或 resident-window 阈值触发后，才兑现整组 hot blocks；本项目默认 window 为 64 页，水位为 `max(每层 hot blocks, GPU blocks//10)`。
+
+### 驱逐哪些：先过滤，再按队列取
+
+1. 优先使用真正空闲的 blocks。
+2. 排除最后两页、host 镜像未完成的页，以及消费者租约仍保护的页。当前 RowLease 会保守保护本层全部 resident pages。
+3. 对剩下的 clean、sealed 历史页，常规流程按页号从大到小加入可回收队列，之后按队列顺序复用；因此不是一个全局访问 LRU。
+4. 若初次分配 hot 还差 blocks，预检本层合格历史页是否能补足；能补足才整组执行，失败则保留原映射和 hot demand，等完成事件或租约释放后重试。该补足路径使用 allocator 的候选顺序。
+
+例如本层需要 4 个 hot blocks，当前只有 2 个可分配 blocks，就必须先找到另外 2 个可安全回收的本层历史 blocks；如果找不到，不能先卸载一半再留下无法执行的状态。
+
+Hot 内部则按另一套规则替换：**先保护本步全部 hot hits，再用空 slot 或未受保护的 LRU slot 放 misses。** 这不会再向 GPU 池申请 block。
+
+为什么足够？若本步有 `h` 个 hot hits、`m` 个 misses，`h+m<=U`，则 `H-h>=m`。只要 selection 不超配额、lease 正常释放、GPU 工作最终完成，本步缺失 rows 就有落点。默认 `2U` 是性能取舍，不是最小要求；[实测说明](hot-capacity.md) 也表明 hot 更大不保证更少搬运。
+
+## 问题三：如何协调异步搬运和 attention，减少加载等待？
+
+**当前项目的具体做法是：只为 misses 批量发起 row gather，用事件让 attention 等“这些 rows 已经到位”，让下一次覆盖等“旧 attention 已经读完”。新 KV 在写入时就镜像，尽量把备份工作提前到真正回收之前。**
+
+一次 decode 的执行安排如下：
+
+```text
+compute stream：写新 KV，记录写完事件；解析 top-k，生成 miss plan
+transfer stream：等写完事件，镜像新增 KV；
+                 等 miss plan 和旧读者完成，gather 缺失 rows，记录加载完成事件
+compute stream：等加载完成事件，执行 attention；记录读取完成事件
+下一次覆盖：必须等读取完成事件
+```
+
+其中 D2H 镜像和 host→hot gather 排在同一条 transfer stream 上，所以 gather 不会读到尚未写完的 host 数据。常规依赖使用 GPU stream wait event，CPU 不需要为每个 miss 同步；显存完全耗尽的兜底路径可能等待一个能释放容量的 D2H 事件。
+
+这套安排具体减少三类工作：
+
+- **不搬没选中的 KV：** 只传 selected misses，避免整页或整请求换入。
+- **不重复搬：** resident/hot hits 复用，跨头相同 rows 去重。
+- **不把每个 miss 变成 CPU 往返：** 设备生成批量 miss plan，由一次 gather 调用处理；当前 Quest 适配本身仍有 CPU 操作。
+
+**但是，同一层当前仍然先完成 gather，再开始 attention，因此缺失 rows 的加载等待仍在关键路径上。** 当前还没有让 resident 部分 attention 与 miss gather 并行，也没有实现跨层预取。拥有两条 stream，只证明可以表达异步依赖，不能据此回答“已经充分隐藏加载延迟”。SM gather 还会占用计算资源，需要测量实际收益。
+
+如果面试官继续问“如何进一步隐藏等待”，下一步方案是：在 index 已知时提前安排后续层的加载，或先计算 resident 部分 attention、同时加载 misses，再正确合并两部分 softmax 统计量。这些需要额外处理 index 可用时机、buffer 生命周期与 fence，**是后续方案，尚未落地**。[现有时序图](visual-guide.md#6-读写时序地址准备好不代表内容准备好)。
+
+## 对当前项目的直接判断
+
+| 题目关心的事情 | 当前回答到什么程度 |
+|---|---|
+| 页的位置和状态转换 | 已有完整操作流程、实现与数值/生命周期测试 |
+| 共享池中的 victim 与 hot 配额 | 已有明确准入公式、保护条件、回收顺序与 hot row 替换规则；策略仍是启发式 |
+| 降低加载等待 | 已实现少搬数据、复用和正确异步依赖；计算与缺失数据搬运的流水重叠尚不完整 |
+
+因此，前两问已有较直接的实现答案；第三问目前给出的是可运行的基础解法，不能评价为加载等待优化已经做完整。已有 96 项测试和 hot sweep 支持正确性及空间取舍，但它们不能替代 overlap 的时间线与端到端性能验证。
+
+<details>
+<summary>展开：字段细节、容量推导、实现边界、验证证据与五分钟演示</summary>
 
 ## 30 秒开场
 
@@ -190,3 +280,5 @@ python -m pytest -q tests/test_hybrid.py
 **有没有最小显存限制？** 有。Hybrid 要兑现 hot region 与 active tail，并另计模型、索引和 workspace。一个槽位可分窗前进属于 `pages` 扩展，不能当成 vLLM HiSparse 的容量保证。
 
 **如果让我继续优化？** 接原生 learned indexer / MLA，消除 Quest 适配中的 CPU 往返；将设备 resolver fuse；增加共享 indexer 的跨层 miss-plan 复用和预取，再验证整步 CUDA Graph 与真实模型质量。完整对齐范围见 [hybrid-alignment.md](hybrid-alignment.md)。
+
+</details>
