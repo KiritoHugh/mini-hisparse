@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mini-hisparse"
-version = "0.1.0"
+version = "0.2.0"
 description = "A readable, single-GPU inference engine for decoding with partially resident KV caches"
 readme = "README.md"
 license = "MIT"
@@ -33,7 +33,7 @@ models = ["transformers>=4.46,<6", "safetensors", "huggingface-hub"]
 mini-hisparse = "mini_hisparse.cli:main"
 
 [tool.setuptools.packages.find]
-include = ["mini_hisparse*"]
+include = ["mini_hisparse*", "reference*", "experiments*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -41,4 +41,7 @@ markers = ["cuda: requires a CUDA GPU"]
 
 [tool.ruff]
 line-length = 100
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I"]
 

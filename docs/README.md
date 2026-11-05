@@ -6,6 +6,7 @@ Start with [the project README](../README.md) or [中文说明](../README.zh-CN.
 
 | Document | Contents |
 |---|---|
+| [Refactor and migration](refactor.md) | Composition, runtime/reference separation and 0.2 API changes |
 | [Architecture](design.md) | Page/block/row identities, address translation, ownership and execution order |
 | [Validation](validation.md) | Current reproducible checks, recorded hardware and numerical results |
 | [HiSparse alignment](hybrid-alignment.md) | Hot block leases, GPU row replacement and differences from vLLM |

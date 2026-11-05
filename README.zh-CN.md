@@ -71,24 +71,27 @@ python -m pip install -e '.[dev,models]'
 
 ## 结构
 
+`HybridKVCache` 显式组合 `HostStore` 和 `DeviceAllocator`，不再继承 `PagedKVCache`。默认 `model.decode()` 直接调用缓存自己的 `attention()`，运行时不导入 `reference` 或 `experiments`。旧页级实现只用于显式对照实验；两者共享存储基础设施，不共享替换策略。
+
+目录职责和 Python API 迁移见 [重构说明](docs/refactor.md)。
+
 ```text
 mini_hisparse/
-  hybrid.py      默认 hybrid 路径：hot block 租约、resident/tail、row 生命周期
-  row_index.py   LogicalTopK、GPU 地址翻译、hot tags/LRU、紧凑 miss plan
-  row_kernels.py Triton pinned-host row gather、直接读取物理 row 的 attention
-  cache.py       逻辑页表、唯一 GPU KV tensor、pinned host pool、租约和事件
-  allocator.py   物理槽 owner/generation、空闲与可读回收队列、页级参考策略
-  selection.py   每头精确 token mask、Quest min/max、离线选择质量 oracle
-  attention.py   页选择、双窗口流水、在线 softmax 合并、PyTorch oracle
-  kernels.py     Triton paged attention：直接读取物理槽位，不 gather 整个 KV
-  model.py       小型 Qwen2 结构、prefill/decode、可选预训练权重适配
-  engine.py      host/index/hot 容量准入、轮转调度、请求结束回收
-  benchmark.py   resident / serial offload / overlap 三组固定访问轨迹实验
-  traces.py      真实模型激活采集、来源校验、选择质量与复用统计
-  replay.py      固定真实轨迹的缓存策略回放
-  cli.py         demo / generate / bench
-tests/           数值、生命周期、竞态和端到端验证
-docs/            设计、源码对照、面试讲解、实测记录
+  config.py      共享存储配置，不包含旧页级策略参数
+  allocator.py   唯一 GPU KV tensor、block owner/generation 与复用
+  storage.py     HostStore：host backing、逻辑页、写回事件和延迟回收
+  hybrid.py      HybridKVCache：hot 租约、clean 回收、两页 tail 与 row 生命周期
+  row_index.py   LogicalTopK、GPU 地址翻译、hot tags/LRU、miss plan
+  attention.py   解析和搬运后，直接读取物理 row
+  row_kernels.py Triton pinned-host gather 与 GQA attention
+  selection.py   精确 token mask、Quest 选择与数值 oracle
+  model.py       Qwen2/2.5 forward、prefill/decode
+  engine.py      请求准入与调度
+  cli.py         demo / generate；显式调用参考模式和实验
+reference/       独立的页级缓存、分窗 attention 与对应 kernel
+experiments/     benchmark、真实模型 trace 与 replay
+scripts/         可运行的验证与实验入口
+tests/           两种实现的正确性、生命周期和依赖边界验证
 ```
 
 ```mermaid
@@ -159,6 +162,6 @@ flowchart LR
 
 ## 验证与贡献
 
-已记录的 A100 验证为 **93 项测试通过**；真实 Qwen2.5 强制回收历史页后，32 个生成 token 与 Hugging Face 完全一致，prefill 只有一次。96 个真实模型 trace 事件通过相同 selection 的数值对照。配置、原始报告和测量边界见 [验证结果](docs/validation.md)。GitHub CI 运行 CPU 检查，CUDA 正确性需另外验证。
+已记录的 A100 验证为 **94 项测试通过**；真实 Qwen2.5 强制回收历史页后，32 个生成 token 与 Hugging Face 完全一致，prefill 只有一次。96 个真实模型 trace 事件通过相同 selection 的数值对照。配置、原始报告和测量边界见 [验证结果](docs/validation.md)。GitHub CI 运行 CPU 检查，CUDA 正确性需另外验证。
 
 开发与检查方式见 [CONTRIBUTING.md](CONTRIBUTING.md)。历史评审记录和旧版报告见 [文档目录](docs/README.md)。项目采用 [MIT 许可证](LICENSE)，上游项目保留各自的许可证与归属。

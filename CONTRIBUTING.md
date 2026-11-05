@@ -5,8 +5,8 @@ Install Python 3.10+, a PyTorch build appropriate for your device, and the devel
 ```bash
 python -m pip install -e '.[dev,models]'
 python -m pytest -q
-python -m ruff check mini_hisparse scripts tests
-python -m ruff format --check mini_hisparse scripts tests
+python -m ruff check mini_hisparse reference experiments scripts tests
+python -m ruff format --check mini_hisparse reference experiments scripts tests
 python -m build
 ```
 
@@ -21,6 +21,8 @@ python scripts/inspect_residency.py --device cpu
 python scripts/inspect_residency.py --device cuda:0
 python scripts/validate_pretrained.py --force-host
 ```
+
+Runtime code belongs in `mini_hisparse/`; optional page-based comparisons belong in `reference/` and offline measurement code in `experiments/`. Keep the default import/decode path independent of the latter two packages. The boundary test enforces this through a real subprocess CLI run.
 
 Keep patches small and explain the concrete behavior they change. For cache changes, identify the ownership invariant and the condition under which a block can be reused. Test the relevant failure case against a dense or same-selection oracle; performance measurements should preserve identical selections and exclude warmup/oracle work.
 

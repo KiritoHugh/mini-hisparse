@@ -1,8 +1,7 @@
-"""Logical identity survives eviction; physical slots are short-lived leases.
+"""Host-backed logical pages, append mirrors and event-safe retirement.
 
-All device KV lives in ONE tensor. Resident/hot are policies, not allocations.
-The Python control plane is deliberately single-threaded and uses one compute
-stream. Every slot reuse joins its producer, last reader and host mirror events.
+This component knows no eviction policy, hot region or attention window.
+Callers supply the resident placement for append and detach it before retirement.
 """
 
 from __future__ import annotations
@@ -15,45 +14,16 @@ from math import ceil
 
 import torch
 
-from .allocator import DeviceAllocator, WindowPlan
+from .allocator import DeviceAllocator
+from .config import CacheConfig, CapacityError
 
-PageKey = tuple[str, int, int]  # request, layer, logical page
-
-
-class CapacityError(RuntimeError):
-    pass
+PageKey = tuple[str, int, int]
 
 
 class Location(str, Enum):
     HOST = "host"
     RESIDENT = "resident"
     HOT = "hot"
-
-
-@dataclass(frozen=True)
-class CacheConfig:
-    gpu_pages: int = 16
-    host_pages: int = 1024
-    page_size: int = 16
-    kv_heads: int = 2
-    head_dim: int = 32
-    chunk_pages: int = 4
-    device: str = "cuda"
-    dtype: torch.dtype = torch.float32
-    overlap: bool = True
-    eviction_policy: str = "fair_lru"
-    index_budget_bytes: int = 64 * 1024 * 1024
-
-    def __post_init__(self):
-        for name in ("gpu_pages", "host_pages", "page_size", "kv_heads", "head_dim", "chunk_pages"):
-            if getattr(self, name) < 1:
-                raise ValueError(f"{name} must be positive")
-        if self.dtype not in (torch.float32, torch.float16, torch.bfloat16):
-            raise ValueError("KV dtype must be float32, float16 or bfloat16")
-        if self.eviction_policy not in ("legacy", "lru", "fair_lru"):
-            raise ValueError("eviction_policy must be legacy, lru or fair_lru")
-        if self.index_budget_bytes < 1:
-            raise ValueError("index budget must be positive")
 
 
 @dataclass
@@ -64,7 +34,6 @@ class Page:
     location: Location = Location.HOST
     valid_tokens: int = 0
     pins: int = 0
-    touched: int = 0
     ready: object = None
     last_use: object = None
     host_ready: object = None
@@ -88,35 +57,37 @@ class RequestPages:
     host_credits: int
     generation: int
     keys: list[PageKey] = field(default_factory=list)
+    extra_index_bytes: int = 0
+    keepalive: tuple = ()  # caller metadata retained through the retirement event
 
 
-class Lease:
+class PageLease:
     """Pins protect mappings on CPU; events protect bytes on the accelerator."""
 
-    def __init__(self, cache: PagedKVCache, pages: list[Page]):
-        self.cache, self.pages, self.released = cache, pages, False
-        self.handles = [(p.slot, cache.allocator.slots[p.slot].generation, p.key) for p in pages]
+    def __init__(self, store: HostStore, pages: list[Page]):
+        self.store, self.pages, self.released = store, pages, False
+        self.handles = [(p.slot, store.allocator.slots[p.slot].generation, p.key) for p in pages]
 
     def _validate(self):
-        self.cache._check_stream()
+        self.store.check_stream()
         if self.released:
             raise RuntimeError("lease already released")
         for handle in self.handles:
-            self.cache.allocator.validate(*handle)
+            self.store.allocator.validate(*handle)
 
     def wait(self):
         self._validate()
         for page in self.pages:
-            self.cache._wait(self.cache.compute, page.ready)
+            self.store.wait(self.store.compute, page.ready)
 
     def release(self):
         self._validate()
-        done = self.cache._event(self.cache.compute)
+        done = self.store.event(self.store.compute)
         for page in self.pages:
             page.last_use = done
             page.pins -= 1
             if page.pins == 0:
-                self.cache.pinned.discard(page.key)
+                self.store.pinned.discard(page.key)
         self.released = True
 
     def __enter__(self):
@@ -127,16 +98,17 @@ class Lease:
         self.release()
 
 
-class PagedKVCache:
-    def __init__(self, config: CacheConfig):
+class HostStore:
+    def __init__(self, config: CacheConfig, allocator: DeviceAllocator):
         self.config = config
         self.device = torch.device(config.device)
         self.cuda = self.device.type == "cuda"
         if self.cuda and not torch.cuda.is_available():
             raise RuntimeError("CUDA unavailable; use device='cpu' for the reference path")
         shape = (2, config.page_size, config.kv_heads, config.head_dim)
-        self.allocator = DeviceAllocator(config)
+        self.allocator = allocator
         self.pool = self.allocator.storage
+        self.device = self.pool.device
         self.host = torch.empty(
             (config.host_pages, *shape), dtype=config.dtype, pin_memory=self.cuda
         )
@@ -146,12 +118,9 @@ class PagedKVCache:
         self.requests: dict[str, RequestPages] = {}
         self.free_host = list(reversed(range(config.host_pages)))
         self.stats: Counter = Counter()
-        self.clock = 0
         self.pinned: set[PageKey] = set()
-        self.lookahead: set[PageKey] = set()
         self.retired: list[tuple[object, RequestPages, list[Page]]] = []
         self.request_generation = 0
-        self.attention_epoch = 0
 
     @property
     def budget(self):
@@ -168,7 +137,7 @@ class PagedKVCache:
             t.numel() * t.element_size()
             for r in requests
             for t in (r.summaries, r.minimum, r.maximum)
-        )
+        ) + sum(r.extra_index_bytes for r in requests)
 
     def index_reservation_bytes(self, max_tokens, layers):
         return (
@@ -183,21 +152,21 @@ class PagedKVCache:
     def available_host_credits(self):
         return len(self.free_host) - sum(r.host_credits for r in self.requests.values())
 
-    def _context(self, stream):
+    def context(self, stream):
         return torch.cuda.stream(stream) if self.cuda else nullcontext()
 
-    def _event(self, stream):
+    def event(self, stream):
         if not self.cuda:
             return None
         event = torch.cuda.Event()
         event.record(stream)
         return event
 
-    def _wait(self, stream, event):
+    def wait(self, stream, event):
         if event is not None:
             stream.wait_event(event)
 
-    def _check_stream(self):
+    def check_stream(self):
         if self.cuda and torch.cuda.current_stream(self.device) != self.compute:
             raise RuntimeError("cache operations must use the construction compute stream")
 
@@ -205,16 +174,9 @@ class PagedKVCache:
     def page_bytes(self):
         return self.pool[0].numel() * self.pool.element_size()
 
-    @property
-    def window_pages(self):
-        # A soft reserve: two windows can coexist. Residents may borrow EVERY
-        # unused slot; clean pages can be reclaimed before starting a window.
-        windows = 2 if self.config.overlap and self.budget > 1 else 1
-        return min(self.config.chunk_pages, max(1, self.budget // windows))
-
-    def reserve(self, request_id: str, max_tokens: int, layers: int):
-        """Reserve host backing for the whole admitted lifetime, never GPU quota."""
-        self._check_stream()
+    def reserve(self, request_id: str, max_tokens: int, layers: int, *, extra_index_bytes=0):
+        """Reserve host backing and index bytes for the admitted lifetime."""
+        self.check_stream()
         self.collect()
         if request_id in self.requests:
             raise ValueError(f"duplicate request {request_id}")
@@ -225,7 +187,7 @@ class PagedKVCache:
             raise CapacityError(
                 f"need {n * layers} host credits; have {self.available_host_credits}"
             )
-        index_bytes = self.index_reservation_bytes(max_tokens, layers)
+        index_bytes = self.index_reservation_bytes(max_tokens, layers) + extra_index_bytes
         if self.index_bytes + index_bytes > self.config.index_budget_bytes:
             raise CapacityError("GPU index budget exhausted; defer request admission")
         summaries = torch.zeros(
@@ -245,10 +207,11 @@ class PagedKVCache:
             n * layers,
             self.request_generation,
         )
+        request.extra_index_bytes = extra_index_bytes
         self.request_generation += 1
         self.requests[request_id] = request
 
-    def _materialize(self, request_id, layer, index):
+    def materialize(self, request_id, layer, index):
         key = (request_id, layer, index)
         if key not in self.pages:
             request = self.requests[request_id]
@@ -259,139 +222,35 @@ class PagedKVCache:
             self.stats["materialized_pages"] += 1
         return self.pages[key]
 
-    def _touch(self, page: Page):
-        self.clock += 1
-        page.touched = self.clock
-        if page.slot is not None:
-            self.allocator.touch(page.key)
-
-    def _detach(self, page: Page):
+    def detach(self, page: Page):
         assert page.slot is not None and page.pins == 0
         slot = page.slot
         assert page.host_enqueued_version == page.content_version
         # GPU slot becomes logically free immediately, but reuse is fenced.
         # In particular, a queued D2H copy still READS this slot!
         for event in (page.ready, page.last_use, page.host_ready):
-            self._wait(self.transfer, event)
-        self.allocator.release(slot, self._event(self.transfer))
+            self.wait(self.transfer, event)
+        self.allocator.release(slot, self.event(self.transfer))
         page.slot, page.location = None, Location.HOST
         self.stats["evictions"] += 1
 
-    def _slot(self):
-        # Append locality matters when the whole selection cannot stay resident.
-        # Sink retention is earned by actual use and expires after two rounds.
-        horizon = 2 * sum(request.layers for request in self.requests.values())
-        anchors = {
-            key
-            for key in self.allocator.lru
-            if (
-                not self.pages[key].sealed
-                or (
-                    key[2] == 0
-                    and self.attention_epoch - self.pages[key].last_attention_epoch <= horizon
-                )
-            )
-        }
-        if self.config.eviction_policy != "fair_lru":
-            anchors = set()
-        slot = self.allocator.choose(
-            self.pages, self.config.eviction_policy, len(self.requests), self.lookahead, anchors
-        )
-        if slot is None:
-            raise CapacityError("all device slots leased; split the attention working set")
-        owner = self.allocator.slots[slot].owner
-        if owner is not None:
-            self._detach(self.pages[owner])
-        return slot
-
-    def _bind(self, page: Page, slot: int, location: Location):
+    def bind(self, page: Page, slot: int, location: Location):
         page.slot, page.location = slot, location
         page.last_use = None
         self.allocator.bind(slot, page.key)
-        self._touch(page)
         self.stats["peak_device_pages"] = max(
             self.stats["peak_device_pages"], len(self.allocator.lru)
         )
 
-    def acquire(self, keys: list[PageKey], purpose="attention") -> Lease:
-        self._check_stream()
-        keys = list(dict.fromkeys(keys))
-        if not keys:
-            raise ValueError("empty working set")
-        pages = [self.pages[key] for key in keys]
-        if any(p.valid_tokens == 0 for p in pages):
-            raise ValueError("cannot read an unwritten page")
-        if len(self.pinned | set(keys)) > self.budget:
-            raise CapacityError("working set exceeds available leases; no state changed")
-        # Pin ALL hits before allocating any miss. Otherwise a later hit could
-        # be evicted while resolving an earlier miss in this same selection.
-        for page in pages:
-            page.pins += 1
-            self.pinned.add(page.key)
-        for page in pages:
-            if purpose == "attention":
-                page.last_attention_epoch = self.attention_epoch
-            if page.slot is not None:
-                self.stats[f"{page.location.value}_hits"] += 1
-                self.stats[f"{purpose}_{page.location.value}_hits"] += 1
-            else:
-                slot = self._slot()
-                self._wait(self.transfer, self.allocator.slots[slot].fence)
-                self._wait(self.transfer, page.host_ready)
-                with self._context(self.transfer):
-                    if page.valid_tokens == self.config.page_size:
-                        self.pool[slot].copy_(self.host[page.host_slot], non_blocking=self.cuda)
-                    else:
-                        # [:, :n] is strided across K/V planes. Copy each plane
-                        # contiguously to avoid pageable temporary staging.
-                        for plane in (0, 1):
-                            self.pool[slot, plane, : page.valid_tokens].copy_(
-                                self.host[page.host_slot, plane, : page.valid_tokens],
-                                non_blocking=self.cuda,
-                            )
-                page.ready = self._event(self.transfer)
-                self._bind(page, slot, Location.HOT)
-                self.stats["misses"] += 1
-                self.stats[f"{purpose}_misses"] += 1
-                self.stats[f"{purpose}_h2d_bytes"] += (
-                    self.page_bytes * page.valid_tokens // self.config.page_size
-                )
-                self.stats["h2d_bytes"] += (
-                    self.page_bytes * page.valid_tokens // self.config.page_size
-                )
-            self._touch(page)
-        return Lease(self, pages)
-
-    def plan(self, keys):
-        """Bound live leases by the real union, subtracting other consumers."""
-        keys = set(keys)
-        self.attention_epoch += 1
-        outside = len(self.pinned - keys)
-        # Existing leases cannot be released by this attention invocation, even
-        # when they overlap its selection. Count all of them conservatively.
-        available = self.budget - len(self.pinned)
-        if available < 1:
-            if keys <= self.pinned:
-                return WindowPlan(
-                    min(self.config.chunk_pages, len(keys)),
-                    False,
-                    len(keys),
-                    0,
-                    outside,
-                    len(keys),
-                    0,
-                )
-            raise CapacityError("no available window; all capacity leased by other consumers")
-        pipeline = self.config.overlap and available > 1
-        width = min(self.config.chunk_pages, max(1, available // (2 if pipeline else 1)))
-        misses = sum(self.pages[key].slot is None for key in keys)
-        live = min(len(keys), width * (2 if pipeline else 1))
-        return WindowPlan(width, pipeline, len(keys), misses, outside, live, min(misses, live))
-
     @torch.inference_mode()
-    def write(self, request_id: str, layer: int, k: torch.Tensor, v: torch.Tensor):
-        """Append projected, RoPE-applied K/V; eagerly mirror ONLY the new rows."""
-        self._check_stream()
+    def append(self, request_id, layer, k, v, prepare_page, after_write=None):
+        """Append projected K/V and mirror only new rows.
+
+        prepare_page(page) supplies resident placement and an optional read
+        lease for an existing tail. after_write(page) updates caller policy
+        after mirror submission. Storage never selects a replacement victim.
+        """
+        self.check_stream()
         request = self.requests[request_id]
         cfg = self.config
         if not 0 <= layer < request.layers:
@@ -414,19 +273,14 @@ class PagedKVCache:
         while offset < len(k):
             position = start + offset
             index, within = divmod(position, cfg.page_size)
-            page = self._materialize(request_id, layer, index)
+            page = self.materialize(request_id, layer, index)
             count = min(cfg.page_size - within, len(k) - offset)
-            lease = None
-            if page.valid_tokens:
-                lease = self.acquire([page.key], purpose="append")
+            lease = prepare_page(page)
+            if lease is not None:
                 lease.wait()
-            else:
-                slot = self._slot()
-                self._wait(self.compute, self.allocator.slots[slot].fence)
-                self._bind(page, slot, Location.RESIDENT)
             # Join previous reads and host mirrors before modifying the page.
             for event in (page.ready, page.last_use, page.host_ready):
-                self._wait(self.compute, event)
+                self.wait(self.compute, event)
             target = self.pool[page.slot]
             target[0, within : within + count].copy_(k[offset : offset + count])
             target[1, within : within + count].copy_(v[offset : offset + count])
@@ -441,10 +295,10 @@ class PagedKVCache:
             request.maximum[layer, index].copy_(
                 torch.maximum(request.maximum[layer, index], new_keys.amax(0))
             )
-            page.ready = self._event(self.compute)
+            page.ready = self.event(self.compute)
             page.location = Location.RESIDENT
-            self._wait(self.transfer, page.ready)
-            with self._context(self.transfer):
+            self.wait(self.transfer, page.ready)
+            with self.context(self.transfer):
                 if within == 0 and count == cfg.page_size:
                     self.host[page.host_slot].copy_(target, non_blocking=self.cuda)
                 else:
@@ -452,49 +306,36 @@ class PagedKVCache:
                         self.host[page.host_slot, plane, within : within + count].copy_(
                             target[plane, within : within + count], non_blocking=self.cuda
                         )
-            page.host_ready = self._event(self.transfer)
+            page.host_ready = self.event(self.transfer)
             page.host_enqueued_version = page.content_version
             if not self.cuda:
                 page.host_committed_version = page.content_version
             self.stats["d2h_bytes"] += self.page_bytes * count // cfg.page_size
             if lease is not None:
                 lease.release()
-            self._after_write(page)
+            if after_write is not None:
+                after_write(page)
             offset += count
         request.lengths[layer] += len(k)
 
-    def _after_write(self, page):
-        """Optional per-page policy hook after the mirror has been submitted."""
-
-    def set_budget(self, pages: int):
-        """Inject logical pressure inside a fixed allocation (does not cudaFree)."""
-        self._check_stream()
-        if not 1 <= pages <= self.config.gpu_pages:
-            raise ValueError("budget must be within the allocated pool")
-        victims = [self.pages[key] for key in self.owners[pages:] if key is not None]
-        if any(p.pins for p in victims):
-            raise CapacityError("cannot shrink over active leases")
-        for page in victims:
-            self._detach(page)
-        self.allocator.budget = pages
-
-    def release_request(self, request_id: str, wait=True):
-        self._check_stream()
+    def retire(self, request_id: str, *, keepalive=()):
+        self.check_stream()
         request = self.requests[request_id]
         if any(self.pages[key].pins for key in request.keys):
             raise RuntimeError("cannot free a request with active leases")
         retired = []
         for key in request.keys:
             page = self.pages[key]
-            if page.slot is not None:
-                self._detach(page)
+            assert page.slot is None, "detach resident blocks before retiring host backing"
             for event in (page.ready, page.last_use, page.host_ready):
-                self._wait(self.transfer, event)
+                self.wait(self.transfer, event)
             retired.append(self.pages.pop(key))
         del self.requests[request_id]
-        self.retired.append((self._event(self.transfer), request, retired))
+        request.keepalive = tuple(keepalive)
+        done = self.event(self.transfer)
+        self.retired.append((done, request, retired))
         self.stats["retired_requests"] += 1
-        self.collect(wait=wait)
+        return done
 
     def collect(self, wait=False):
         """Publish reusable host slots only AFTER all in-flight users finish.
@@ -566,9 +407,7 @@ class PagedKVCache:
             "host_unused_credits": sum(r.host_credits for r in self.requests.values()),
             "host_available_credits": self.available_host_credits,
             "retiring_requests": len(self.retired),
-            "eviction_policy": self.config.eviction_policy,
             "request_device_pages": dict(self.allocator.occupancy),
-            "fair_share_target": max(1, self.budget // max(1, len(self.requests))),
             "locations": dict(counts),
             "stats": dict(self.stats),
         }

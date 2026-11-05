@@ -6,10 +6,11 @@ from pathlib import Path
 
 import torch
 
-from mini_hisparse.attention import dense_attention
-from mini_hisparse.cache import CacheConfig
-from mini_hisparse.hybrid import HotConfig, HybridKVCache, row_attention
+from mini_hisparse.attention import row_attention
+from mini_hisparse.config import CacheConfig
+from mini_hisparse.hybrid import HotConfig, HybridKVCache
 from mini_hisparse.row_index import LogicalTopK
+from mini_hisparse.selection import dense_attention
 
 
 @torch.inference_mode()
@@ -36,11 +37,11 @@ def main():
 
     k, v = write("a", 12)
     watched = ("a", 0, 0)
-    original_slot = cache.pages[watched].slot
+    original_slot = cache.storage.pages[watched].slot
     records = []
 
     def record(label):
-        cache.synchronize()  # diagnostic snapshots, not part of timed decode
+        cache.storage.synchronize()  # diagnostic snapshots, not part of timed decode
         records.append(
             {
                 "stage": label,

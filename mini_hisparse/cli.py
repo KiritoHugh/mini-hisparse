@@ -6,8 +6,7 @@ from pathlib import Path
 
 import torch
 
-from .benchmark import benchmark
-from .cache import CacheConfig, PagedKVCache
+from .config import CacheConfig
 from .engine import Engine
 from .hybrid import HotConfig, HybridKVCache
 from .model import MiniModel
@@ -85,17 +84,20 @@ def main():
         "gpu_pages": args.gpu_pages if args.gpu_pages is not None else 8,
         "host_pages": args.host_pages,
         "page_size": args.page_size,
-        "chunk_pages": args.chunk_pages,
         "device": args.device,
         "dtype": dtype,
-        "eviction_policy": args.eviction_policy,
         "index_budget_bytes": args.index_budget_mib * 1024 * 1024,
     }
     if args.command == "bench":
+        from experiments.benchmark import benchmark
+        from reference.cache import PagedConfig
+
         if args.trace:
             args.trace.parent.mkdir(parents=True, exist_ok=True)
         result = benchmark(
-            CacheConfig(**common),
+            PagedConfig(
+                **common, chunk_pages=args.chunk_pages, eviction_policy=args.eviction_policy
+            ),
             args.tokens,
             args.steps,
             args.requests,
@@ -147,13 +149,20 @@ def main():
             )
             if args.gpu_pages is None:
                 common["gpu_pages"] = hot.admission_blocks(args.page_size, cfg.num_hidden_layers)
-        cache_config = CacheConfig(
-            **common,
-            kv_heads=cfg.num_key_value_heads,
-            head_dim=cfg.head_dim,
-            overlap=not args.no_overlap,
-        )
-        cache = HybridKVCache(cache_config, hot) if hot else PagedKVCache(cache_config)
+        common.update(kv_heads=cfg.num_key_value_heads, head_dim=cfg.head_dim)
+        if hot is not None:
+            cache = HybridKVCache(CacheConfig(**common), hot)
+        else:
+            from reference.cache import PagedConfig, PagedKVCache
+
+            cache = PagedKVCache(
+                PagedConfig(
+                    **common,
+                    chunk_pages=args.chunk_pages,
+                    overlap=not args.no_overlap,
+                    eviction_policy=args.eviction_policy,
+                )
+            )
         engine = Engine(
             model,
             cache,

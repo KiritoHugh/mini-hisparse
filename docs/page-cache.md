@@ -1,12 +1,12 @@
 # 页级参考路径的部分驻留解码设计
 
-本页描述保留的 `PagedKVCache` / `--cache-layout pages` 路径。默认 hybrid 路径已拆分 block 租约和 token-row 内容替换，使用 GPU 地址解析；其当前设计、容量公式与 vLLM 对照见 [hybrid-alignment.md](hybrid-alignment.md)。本页的单槽进展、软尾页保护和 CPU resolver 不适用于 hybrid。
+本页描述 `reference/cache.py` 中独立保留的 `PagedKVCache` / `--cache-layout pages` 路径。默认 hybrid 路径已拆分 block 租约和 token-row 内容替换，使用 GPU 地址解析；其当前设计、容量公式与 vLLM 对照见 [hybrid-alignment.md](hybrid-alignment.md)。本页的单槽进展、软尾页保护和 CPU resolver 不适用于 hybrid。
 
 ## 1. 身份、存储、可读性是三件事
 
 逻辑页键为 `(request_id, layer_id, page_index)`。一页覆盖同一层的连续 `P` 个 token，包含该层全部 KV heads 的 K/V。准入时只预留 host 容量 credit；首次写入该逻辑页时才建立 `Page` 对象并分配稳定的 `host_slot`。`gpu_slot` 可以缺失或变化，逻辑身份不变。未使用的输出长度不再创建成千上万个页对象。
 
-GPU KV 唯一分配为 `[G, 2, P, Hkv, D]`，host pool 为同布局的 pinned CPU tensor。`DeviceAllocator` 负责物理槽、空闲集合、LRU、请求占用计数和 generation；`PagedKVCache` 负责逻辑页、host 内容与搬运事件。allocator 的 slot owner 是反向页表，`Page.slot` 是正向映射。resident 和 hot 指向同一底层 tensor，区别仅是内容来源及策略，不是两份内存。
+GPU KV 唯一分配为 `[G, 2, P, Hkv, D]`，host pool 为同布局的 pinned CPU tensor。`DeviceAllocator` 负责物理槽、空闲集合、LRU、请求占用计数和 generation；`HostStore` 负责逻辑页、host 内容与搬运事件，`reference.PagedKVCache` 只负责页级获取、逐出和窗口规划。allocator 的 slot owner 是反向页表，`Page.slot` 是正向映射。resident 和 hot 指向同一底层 tensor，区别仅是内容来源及策略，不是两份内存。
 
 一个枚举不足以表达异步状态，因此拆成以下正交字段：
 

@@ -1,9 +1,10 @@
 import pytest
 import torch
 
-from mini_hisparse.attention import paged_attention
-from mini_hisparse.cache import CacheConfig, PagedKVCache
 from mini_hisparse.selection import Selection, quest_selection, selection_oracle
+from reference.attention import paged_attention
+from reference.cache import PagedConfig as CacheConfig
+from reference.cache import PagedKVCache
 
 
 @pytest.mark.parametrize("device", ["cpu", "cuda:0"])
@@ -23,7 +24,7 @@ def test_exact_tokens_head_masks_and_empty_windows(device, budget):
     cache.write("r", 0, k, v)
     selection = Selection.from_tokens([[0, 0, -1], [18], [5, 6], [12, 18]], 19, 4, 4)
     expected, _ = selection_oracle(q, k, v, selection)
-    for backend in ["torch", "triton"] if cache.cuda else ["torch"]:
+    for backend in ["torch", "triton"] if cache.storage.cuda else ["torch"]:
         actual = paged_attention(q, cache, "r", 0, backend=backend, selection=selection)
         torch.testing.assert_close(actual, expected, rtol=2e-5, atol=2e-6)
     cache.assert_invariants()
@@ -37,7 +38,7 @@ def test_quest_bound_handles_mean_cancellation_and_incremental_tail():
     k = torch.tensor([[[10.0, 0.0]], [[-10.0, 0.0]], [[1.0, 0.0]], [[1.0, 0.0]], [[0.0, 0.0]]])
     cache.write("r", 0, k[:4], k[:4])
     cache.write("r", 0, k[4:], k[4:])
-    r = cache.requests["r"]
+    r = cache.storage.requests["r"]
     selection = quest_selection(
         torch.tensor([[1.0, 0.0]]), r.minimum[0], r.maximum[0], 5, 2, 2, keep_sink=False
     )

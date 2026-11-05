@@ -1,9 +1,10 @@
 import pytest
 import torch
 
-from mini_hisparse.cache import CacheConfig, PagedKVCache
 from mini_hisparse.engine import Engine
 from mini_hisparse.model import MiniModel, ModelConfig
+from reference.cache import PagedConfig as CacheConfig
+from reference.cache import PagedKVCache
 
 
 @pytest.mark.parametrize("device", ["cpu", "cuda:0"])
@@ -40,10 +41,10 @@ def test_real_autoregressive_decode_matches_resident_engine(device, top_k):
         outputs.append(engine.run())
         assert all(r.prefill_count == 1 for r in engine.requests.values())
         assert all(r.decode_count == r.max_new_tokens - 1 for r in engine.requests.values())
-        assert not cache.requests and not any(cache.owners)
+        assert not cache.storage.requests and not any(cache.owners)
         cache.assert_invariants()
         if budget == 2:
-            assert cache.stats["misses"] > 0
+            assert cache.storage.stats["misses"] > 0
     assert outputs[0] == outputs[1]
     if top_k is None:
         for name, prompt in [("a", list(range(1, 18))), ("b", list(range(8, 30)))]:

@@ -3,10 +3,13 @@ from dataclasses import replace
 import pytest
 import torch
 
-from mini_hisparse.attention import dense_attention, paged_attention
-from mini_hisparse.cache import CacheConfig, CapacityError, PagedKVCache
+from mini_hisparse.config import CapacityError
 from mini_hisparse.engine import Engine
 from mini_hisparse.model import MiniModel, ModelConfig
+from mini_hisparse.selection import dense_attention
+from reference.attention import paged_attention
+from reference.cache import PagedConfig as CacheConfig
+from reference.cache import PagedKVCache
 
 
 def cfg(**kwargs):
@@ -31,7 +34,7 @@ def test_recent_hot_contents_survive_cold_resident(policy, keeps_hot):
         pass
     with cache.acquire([("a", 0, 1)]):
         pass
-    assert (cache.pages[("a", 0, 0)].slot is not None) == keeps_hot
+    assert (cache.storage.pages[("a", 0, 0)].slot is not None) == keeps_hot
     cache.assert_invariants()
 
 
@@ -43,7 +46,7 @@ def test_soft_fair_share_and_borrowing_idle_capacity():
     write(cache, "a", 12)
     write(cache, "b", 4)
     assert cache.allocator.occupancy == {"a": 2, "b": 2}
-    assert cache.pages[("b", 0, 0)].slot is not None
+    assert cache.storage.pages[("b", 0, 0)].slot is not None
     cache.release_request("b")
     write(cache, "a", 12)
     assert cache.allocator.occupancy["a"] == 4
@@ -58,7 +61,7 @@ def test_sink_soft_protection_expires_when_access_pattern_changes():
     paged_attention(q, cache, "a", 0, [0])
     for page in [1, 2, 1, 2]:
         paged_attention(q, cache, "a", 0, [page])
-    assert cache.pages[("a", 0, 0)].slot is None
+    assert cache.storage.pages[("a", 0, 0)].slot is None
     cache.assert_invariants()
 
 
@@ -67,9 +70,9 @@ def test_lookahead_preserves_future_hit_and_window_respects_other_leases():
     cache.reserve("a", 16, 1)
     k, v = write(cache, "a", 16)
     q = torch.randn(2, 4)
-    before = cache.stats["attention_misses"]
+    before = cache.storage.stats["attention_misses"]
     actual = paged_attention(q, cache, "a", 0, [0, 1, 3])
-    assert cache.stats["attention_misses"] - before == 1
+    assert cache.storage.stats["attention_misses"] - before == 1
     torch.testing.assert_close(
         actual, dense_attention(q, k[[*range(8), *range(12, 16)]], v[[*range(8), *range(12, 16)]])
     )
@@ -85,17 +88,17 @@ def test_lookahead_preserves_future_hit_and_window_respects_other_leases():
 def test_lazy_materialization_and_index_admission_are_atomic():
     cache = PagedKVCache(cfg(host_pages=20, index_budget_bytes=960))
     cache.reserve("a", 40, 2)
-    assert len(cache.pages) == 0 and len(cache.free_host) == 20
-    assert cache.available_host_credits == 0
+    assert len(cache.storage.pages) == 0 and len(cache.storage.free_host) == 20
+    assert cache.storage.available_host_credits == 0
     write(cache, "a", 1)
-    assert len(cache.pages) == 1 and cache.requests["a"].host_credits == 19
+    assert len(cache.storage.pages) == 1 and cache.storage.requests["a"].host_credits == 19
     cache.assert_invariants()
     cache.release_request("a")
-    assert len(cache.free_host) == 20
+    assert len(cache.storage.free_host) == 20
     cache = PagedKVCache(cfg(host_pages=20, index_budget_bytes=959))
     with pytest.raises(CapacityError, match="index budget"):
         cache.reserve("a", 40, 2)
-    assert not cache.requests and len(cache.free_host) == 20
+    assert not cache.storage.requests and len(cache.storage.free_host) == 20
 
 
 def test_bfloat16_bounds_are_exact_and_index_budget_counts_actual_bytes():
@@ -103,7 +106,7 @@ def test_bfloat16_bounds_are_exact_and_index_budget_counts_actual_bytes():
     cache.reserve("a", 12, 1)
     k = torch.randn(7, 1, 4).bfloat16()
     cache.write("a", 0, k, k)
-    request = cache.requests["a"]
+    request = cache.storage.requests["a"]
     assert request.minimum.dtype == torch.bfloat16
     torch.testing.assert_close(request.minimum[0, 0], k[:4].amin(0))
     assert cache.index_bytes == cache.index_reservation_bytes(12, 1) == 3 * 1 * 4 * 8
@@ -120,7 +123,7 @@ def test_shrink_rejects_active_slot_atomically_and_versions_track_tail():
         assert cache.budget == 3
     cache.set_budget(1)
     write(cache, "a", 3)
-    state = cache.page_state(("a", 0, 2))
+    state = cache.storage.page_state(("a", 0, 2))
     assert state["sealed"] and state["content_version"] == 2
     assert state["host_committed_version"] == 2
     cache.assert_invariants()
@@ -142,7 +145,7 @@ def test_deferred_reclaim_protects_host_bytes_and_slot_generation():
         pytest.skip("CUDA unavailable")
     cache = PagedKVCache(cfg(device="cuda:0", gpu_pages=1, host_pages=1))
     cache.reserve("a", 4, 1)
-    old_request_generation = cache.requests["a"].generation
+    old_request_generation = cache.storage.requests["a"].generation
     old, _ = write(cache, "a", 4)
     with cache.acquire([("a", 0, 0)]) as lease:
         handle = lease.handles[0]
@@ -150,17 +153,17 @@ def test_deferred_reclaim_protects_host_bytes_and_slot_generation():
         observed = cache.pool[0, 0].clone()
     cache.release_request("a", wait=False)
     # No global synchronization; host backing is still owned by the event.
-    assert cache.retired and not cache.free_host
+    assert cache.storage.retired and not cache.storage.free_host
     with pytest.raises(CapacityError):
         cache.reserve("a", 4, 1)
     cache.collect(wait=True)
     cache.reserve("a", 4, 1)
-    assert cache.requests["a"].generation > old_request_generation
+    assert cache.storage.requests["a"].generation > old_request_generation
     new, _ = write(cache, "a", 4)
     with pytest.raises(RuntimeError, match="generation"):
         cache.allocator.validate(*handle)
     torch.testing.assert_close(observed, old)
-    torch.testing.assert_close(cache.host_kv("a", 0)[0], new.cpu())
+    torch.testing.assert_close(cache.storage.host_kv("a", 0)[0], new.cpu())
     cache.assert_invariants()
 
 
@@ -185,5 +188,5 @@ def test_cancellation_reclaims_only_cancelled_request():
     engine.run()
     assert engine.requests["a"].cancelled and engine.requests["b"].cancelled
     assert len(engine.requests["c"].generated) == 4
-    assert not cache.requests and not cache.retired
+    assert not cache.storage.requests and not cache.storage.retired
     cache.assert_invariants()

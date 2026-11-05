@@ -6,8 +6,8 @@ from pathlib import Path
 
 import torch
 
+from experiments.traces import analyze, capture, load_trace
 from mini_hisparse.model import MiniModel
-from mini_hisparse.traces import analyze, capture, load_trace
 
 
 def main():

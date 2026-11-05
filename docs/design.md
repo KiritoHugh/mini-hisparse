@@ -2,6 +2,37 @@
 
 The default `hybrid` path separates **logical KV history**, **physical block ownership**, and **hot row contents**. The optional page-based reference has its own [design](page-cache.md).
 
+## Components and dependency direction
+
+```mermaid
+flowchart TD
+    E[Engine / Model] --> C[HybridKVCache]
+    C --> S[HostStore]
+    C --> A[DeviceAllocator]
+    S --> A
+    C --> R[GPU RowResolver]
+    R --> K[Row gather / attention kernels]
+    P[Optional reference.PagedKVCache] --> S
+```
+
+`HybridKVCache` is a standalone class, not a subclass of the reference cache.
+`HostStore` owns logical pages, host credits, summaries, mirror versions and
+retirement events. It receives `prepare_page` / `after_write` callbacks for an
+append, but has no hot allocation, page victim selection or window policy.
+`DeviceAllocator` owns the GPU slab and block generations. Hybrid decides when
+to unpin/reuse history and how to lease hot blocks; the GPU resolver replaces
+rows within those already-leased blocks.
+
+`model.decode()` constructs a `Selection` and calls `cache.attention()`; it
+never dispatches through page attention or checks a cache's concrete type.
+The reference implements the same operation in its own package. The CLI
+imports optional packages only when `--cache-layout pages` or `bench` is chosen.
+
+Caller-owned metadata bytes are reserved with host/index credits. When a
+request retires, `HostStore.retire(keepalive=...)` retains its row tables through
+the same completion event as host backing, so their physical lifetime and
+index-budget lifetime cannot diverge.
+
 ## Three granularities
 
 | Unit | Identity | Responsibility |

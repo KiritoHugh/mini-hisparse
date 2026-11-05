@@ -3,8 +3,12 @@ from dataclasses import replace
 import pytest
 import torch
 
-from mini_hisparse.attention import dense_attention, paged_attention, select_pages
-from mini_hisparse.cache import CacheConfig, CapacityError, Location, PagedKVCache
+from mini_hisparse.config import CapacityError
+from mini_hisparse.selection import dense_attention, select_pages
+from mini_hisparse.storage import Location
+from reference.attention import paged_attention
+from reference.cache import PagedConfig as CacheConfig
+from reference.cache import PagedKVCache
 
 
 @pytest.fixture(params=["cpu", "cuda:0"])
@@ -48,20 +52,20 @@ def test_partial_residency_append_and_sparse_oracle(device, overlap, budget):
         tokens = [
             t for page in dict.fromkeys(pages) for t in range(page * 4, min(page * 4 + 4, len(k)))
         ]
-        for backend in ["torch", "triton"] if cache.cuda else ["torch"]:
+        for backend in ["torch", "triton"] if cache.storage.cuda else ["torch"]:
             actual = paged_attention(q, cache, "a", 0, pages, backend)
             torch.testing.assert_close(
                 actual, dense_attention(q, k[tokens], v[tokens]), atol=3e-6, rtol=3e-5
             )
         cache.assert_invariants()
-    host_k, host_v = cache.host_kv("a", 0)
+    host_k, host_v = cache.storage.host_kv("a", 0)
     torch.testing.assert_close(host_k, k.cpu())
     torch.testing.assert_close(host_v, v.cpu())
     assert cache.pool.data_ptr() == pointer
-    assert cache.stats["peak_device_pages"] <= budget
-    assert cache.stats["evictions"] > 0
+    assert cache.storage.stats["peak_device_pages"] <= budget
+    assert cache.storage.stats["evictions"] > 0
     if budget < 3:
-        assert cache.stats["misses"] > 0
+        assert cache.storage.stats["misses"] > 0
 
 
 def test_acquire_protects_later_hits_and_rejects_overcommit(device):
@@ -71,9 +75,9 @@ def test_acquire_protects_later_hits_and_rejects_overcommit(device):
     cache.write("a", 0, k, v)
     # Page 0 is missing; pages 1 and 2 are resident. Protect page 1 BEFORE
     # allocating page 0, even though page 1 is older than page 2.
-    before = cache.pages[("a", 0, 1)].slot
+    before = cache.storage.pages[("a", 0, 1)].slot
     lease = cache.acquire([("a", 0, 0), ("a", 0, 1)])
-    assert cache.pages[("a", 0, 1)].slot == before
+    assert cache.storage.pages[("a", 0, 1)].slot == before
     snapshot = list(cache.owners)
     with pytest.raises(CapacityError):
         cache.acquire([("a", 0, 2)])
@@ -84,7 +88,7 @@ def test_acquire_protects_later_hits_and_rejects_overcommit(device):
     lease.release()
     cache.release_request("a")
     cache.assert_invariants()
-    assert len(cache.free_host) == cache.config.host_pages
+    assert len(cache.storage.free_host) == cache.config.host_pages
 
 
 def test_hot_reuse_no_reload_then_dynamic_pressure(device):
@@ -94,10 +98,10 @@ def test_hot_reuse_no_reload_then_dynamic_pressure(device):
     q = torch.randn(4, 8, device=device)
     cache.write("a", 0, k, v)
     paged_attention(q, cache, "a", 0, [0])
-    assert cache.pages[("a", 0, 0)].location == Location.HOT
-    misses = cache.stats["misses"]
+    assert cache.storage.pages[("a", 0, 0)].location == Location.HOT
+    misses = cache.storage.stats["misses"]
     paged_attention(q, cache, "a", 0, [0])
-    assert cache.stats["misses"] == misses
+    assert cache.storage.stats["misses"] == misses
     cache.set_budget(1)
     actual = paged_attention(q, cache, "a", 0)
     torch.testing.assert_close(actual, dense_attention(q, k, v), atol=3e-6, rtol=3e-5)
@@ -111,8 +115,8 @@ def test_resident_hits_never_fetch(device):
     k, v = [torch.randn(13, 2, 8, device=device) for _ in range(2)]
     cache.write("a", 0, k, v)
     paged_attention(torch.randn(4, 8, device=device), cache, "a", 0)
-    assert cache.stats["misses"] == cache.stats["h2d_bytes"] == 0
-    assert cache.stats["resident_hits"] == 4
+    assert cache.storage.stats["misses"] == cache.storage.stats["h2d_bytes"] == 0
+    assert cache.storage.stats["resident_hits"] == 4
 
 
 def test_host_admission_is_atomic_and_ids_are_reusable(device):
@@ -120,7 +124,7 @@ def test_host_admission_is_atomic_and_ids_are_reusable(device):
     cache.reserve("a", 8, 2)
     with pytest.raises(CapacityError):
         cache.reserve("b", 1, 1)
-    assert "b" not in cache.requests
+    assert "b" not in cache.storage.requests
     cache.release_request("a")
     cache.reserve("a", 16, 1)
     cache.assert_invariants()

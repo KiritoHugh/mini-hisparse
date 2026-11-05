@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections import deque
 from dataclasses import dataclass, field
 
-from .cache import CapacityError, PagedKVCache
+from .config import CapacityError
 from .model import MiniModel
 
 
@@ -25,7 +25,7 @@ class Engine:
     def __init__(
         self,
         model: MiniModel,
-        cache: PagedKVCache,
+        cache,
         top_k=None,
         backend="auto",
         eos_token_id: int | None = None,
@@ -96,7 +96,7 @@ class Engine:
                 admitted = True
             except CapacityError:
                 if not self.running:
-                    if not self.cache.retired:
+                    if not self.cache.storage.retired:
                         raise
                     self.cache.collect(wait=True)
                     self.cache.reserve(

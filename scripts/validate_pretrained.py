@@ -9,10 +9,11 @@ import json
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-from mini_hisparse.cache import CacheConfig, PagedKVCache
 from mini_hisparse.engine import Engine
 from mini_hisparse.hybrid import HotConfig, HybridKVCache
 from mini_hisparse.model import MiniModel
+from reference.cache import PagedConfig as CacheConfig
+from reference.cache import PagedKVCache
 
 
 def main():
@@ -75,7 +76,7 @@ def main():
             parser.error("--force-host requires --cache-layout hybrid")
         engine.step()
         if not request.finished:
-            cache.synchronize()  # explicit pressure experiment, outside normal decode
+            cache.storage.synchronize()  # explicit pressure experiment, outside normal decode
             for layer in range(cfg.num_hidden_layers):
                 cache.reclaim_history("a", layer, evict=True)
     actual = engine.run()["a"]

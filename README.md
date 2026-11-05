@@ -99,8 +99,8 @@ Resident history may borrow unused credits. Hot blocks are physically allocated 
 
 ```bash
 python -m pytest -q
-python -m ruff check mini_hisparse scripts tests
-python -m ruff format --check mini_hisparse scripts tests
+python -m ruff check mini_hisparse reference experiments scripts tests
+python -m ruff format --check mini_hisparse reference experiments scripts tests
 
 # Optional: download a pinned LongBench sample and capture a real model trace.
 python scripts/prepare_longbench.py
@@ -109,11 +109,28 @@ python scripts/model_trace.py analyze
 python scripts/replay_trace.py
 ```
 
-The recorded A100 validation has **93 passing tests**, a 32-token Qwen2.5 greedy-generation match with Hugging Face (`prefill_count=1`), and 96 real model-trace events checked against the same-selection oracle. [Validation](docs/validation.md) identifies configurations, raw reports and measurement limits. GitHub CI runs CPU checks; GPU checks are run separately.
+The recorded A100 validation has **94 passing tests**, a 32-token Qwen2.5 greedy-generation match with Hugging Face (`prefill_count=1`), and 96 real model-trace events checked against the same-selection oracle. [Validation](docs/validation.md) identifies configurations, raw reports and measurement limits. GitHub CI runs CPU checks; GPU checks are run separately.
 
 Raw datasets, weights and tensor traces are not included. Trace results use frozen dense-teacher activations with explicit sparse selection; they are not native DSA traces, end-to-end LongBench scores or serving-throughput measurements.
 
 ## Reading the code
+
+The runtime package contains only the hybrid execution path. `HybridKVCache`
+composes a `HostStore` and `DeviceAllocator`; it does not inherit from the
+page-based reference. `model.decode()` calls `cache.attention()` directly.
+
+```text
+mini_hisparse/   hybrid runtime, storage, row resolver/kernels, model and engine
+reference/      optional page replacement and bounded-window attention
+experiments/    benchmark, model trace capture/analysis and replay
+scripts/        runnable experiment and validation entry points
+tests/          runtime, reference and dependency-boundary checks
+```
+
+The default CLI runs without importing `reference` or `experiments`. Those
+packages are loaded only for explicit comparison/benchmark commands and are
+included in the distribution. See [the refactor and API migration](docs/refactor.md).
+
 
 | File | Responsibility |
 |---|---|
@@ -121,9 +138,10 @@ Raw datasets, weights and tensor traces are not included. Trace results use froz
 | [allocator.py](mini_hisparse/allocator.py) | Shared storage, ownership, readable-unpinned blocks and generations |
 | [row_index.py](mini_hisparse/row_index.py) | Logical-to-physical translation, tags, hit protection and row LRU |
 | [row_kernels.py](mini_hisparse/row_kernels.py) | Triton pinned-host gather and physical-row GQA attention |
-| [cache.py](mini_hisparse/cache.py) | Host backing, page metadata, mirror events and deferred retirement |
+| [storage.py](mini_hisparse/storage.py) | Host backing, page metadata, mirror events and deferred retirement |
 | [model.py](mini_hisparse/model.py) / [engine.py](mini_hisparse/engine.py) | Transformer execution and request scheduling |
-| [selection.py](mini_hisparse/selection.py) / [replay.py](mini_hisparse/replay.py) | Sparse selection and controlled trace experiments |
+| [selection.py](mini_hisparse/selection.py) | Exact selection masks, Quest-style scoring and dense oracles |
+| [reference/](reference/) / [experiments/](experiments/) | Optional page-cache comparison and offline experiments |
 
 ## Scope
 

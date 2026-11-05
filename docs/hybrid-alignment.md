@@ -1,6 +1,8 @@
 # Hybrid 路径：对齐 vLLM 的空间租约、row 替换与索引
 
-本轮对照 vLLM `abf98672ce7e822701f7a062bf240efb2c9900d1`。默认 `demo/generate/replay_trace` 使用新的 `HybridKVCache`；原 `PagedKVCache` 仍可通过 `--cache-layout pages` 使用。两者是不同的缓存机制，不能把页级分窗的单槽进展结论套在 hybrid 上。
+架构已改为显式组合：`HybridKVCache` 使用 `HostStore` 和 `DeviceAllocator`，不再继承页级参考缓存。见 [重构与 API 迁移](refactor.md)。
+
+本轮对照 vLLM `abf98672ce7e822701f7a062bf240efb2c9900d1`。默认 `demo/generate/replay_trace` 使用新的 `HybridKVCache`；独立的 `reference.PagedKVCache` 仍可通过 `--cache-layout pages` 使用。两者是不同的缓存机制，不能把页级分窗的单槽进展结论套在 hybrid 上。
 
 后续已继续对齐 clean/unpinned 页面状态、hot 水位/window 触发与两页 tail；具体变更及新验证见 [residency-alignment.md](residency-alignment.md)。下方旧性能表保留历史结果，不代表当前策略。
 
@@ -94,7 +96,7 @@ compute: wait ready -> physical-row attention -> last_use
   --output results/hybrid-token.json
 ```
 
-当前 **93 项测试通过**，其中最初 hybrid 版本新增 24 项，此次 residency 对齐再新增 15 项。覆盖 row 粒度搬运、resident bypass、不连续 hot blocks、hit 保护、无效/重复 token、逐头掩码、容量与索引准入、异步旧读者、ID 重用、跨请求/层替换、resolver Graph，以及 readable-unpinned 页面、D2H 完成门槛、低水位/window 触发和两页 tail。CUDA FP16/BF16 与 CPU FP32 均验证。
+residency 对齐时 **93 项测试通过**，其中最初 hybrid 版本新增 24 项，此次 residency 对齐再新增 15 项。覆盖 row 粒度搬运、resident bypass、不连续 hot blocks、hit 保护、无效/重复 token、逐头掩码、容量与索引准入、异步旧读者、ID 重用、跨请求/层替换、resolver Graph，以及 readable-unpinned 页面、D2H 完成门槛、低水位/window 触发和两页 tail。CUDA FP16/BF16 与 CPU FP32 均验证。
 
 首版 hybrid 的 Qwen2.5 BF16 强制卸载验证生成 **32 tokens 与 Hugging Face 逐 token 相同**，prefill=1、decode=31，发生 **1,920 row misses / 983,040 B H2D**，保留于 [hybrid-pretrained-parity.json](reports/hybrid-pretrained-parity.json)。当前两页 tail 版本的新验证见 [residency-alignment.md](residency-alignment.md)。这些实验使用完整 selection，检验存储路径，不是稀疏质量结论。
 

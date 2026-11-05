@@ -7,9 +7,9 @@ from statistics import median
 
 import torch
 
-from mini_hisparse.cache import CacheConfig
-from mini_hisparse.replay import prepare, replay
-from mini_hisparse.traces import load_trace
+from experiments.replay import prepare, replay
+from experiments.traces import load_trace
+from reference.cache import PagedConfig as CacheConfig
 
 
 def main():

@@ -39,13 +39,14 @@ jobs:
           python -m pip install -e '.[dev,models]'
       - name: Lint and format
         run: |
-          python -m ruff check mini_hisparse scripts tests
-          python -m ruff format --check mini_hisparse scripts tests
+          python -m ruff check mini_hisparse reference experiments scripts tests
+          python -m ruff format --check mini_hisparse reference experiments scripts tests
       - name: Test
         run: python -m pytest -q
       - name: Smoke test public entry points
         run: |
           mini-hisparse demo --device cpu --top-k 2 --prompt-tokens 257 --gpu-pages 12 --output results/ci-demo.json
           python scripts/inspect_residency.py --device cpu
+          mini-hisparse demo --device cpu --cache-layout pages --gpu-pages 1 --prompt-tokens 33 --max-new-tokens 3 --output results/ci-reference.json
       - name: Build wheel and source distribution
         run: python -m build

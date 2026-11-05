@@ -10,8 +10,10 @@ from time import perf_counter
 
 import torch
 
-from .attention import dense_attention, paged_attention
-from .cache import CacheConfig, PagedKVCache
+from mini_hisparse.selection import dense_attention
+from reference.attention import paged_attention
+from reference.cache import PagedConfig as CacheConfig
+from reference.cache import PagedKVCache
 
 
 def benchmark(
@@ -61,11 +63,11 @@ def benchmark(
                 list(range(min(selected_pages, page_count))),
                 backend,
             )
-        cache.synchronize()
-        cache.stats.clear()
+        cache.storage.synchronize()
+        cache.storage.stats.clear()
         observations, durations = [], []
         activities = [torch.profiler.ProfilerActivity.CPU]
-        if cache.cuda:
+        if cache.storage.cuda:
             activities.append(torch.profiler.ProfilerActivity.CUDA)
         profiler = (
             torch.profiler.profile(activities=activities)
@@ -82,7 +84,7 @@ def benchmark(
                     )
                     for name, (k, v) in histories.items()
                 }
-                cache.synchronize()
+                cache.storage.synchronize()
                 started = perf_counter()
                 for name, (k, v) in incoming.items():
                     cache.write(name, 0, k, v)
@@ -99,7 +101,7 @@ def benchmark(
                         q_device[step, int(name)], cache, name, 0, pages, backend
                     )
                     observations.append((step, name, pages, result))
-                cache.synchronize()
+                cache.storage.synchronize()
                 durations.append((perf_counter() - started) * 1000)
         if profile is not None:
             profile.export_chrome_trace(str(trace))

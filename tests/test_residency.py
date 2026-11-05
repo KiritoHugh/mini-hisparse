@@ -3,10 +3,11 @@
 import pytest
 import torch
 
-from mini_hisparse.attention import dense_attention
-from mini_hisparse.cache import CacheConfig, CapacityError
-from mini_hisparse.hybrid import ACTIVE_TAIL_PAGES, HotConfig, HybridKVCache, row_attention
+from mini_hisparse.attention import row_attention
+from mini_hisparse.config import CacheConfig, CapacityError
+from mini_hisparse.hybrid import ACTIVE_TAIL_PAGES, HotConfig, HybridKVCache
 from mini_hisparse.row_index import LogicalTopK
+from mini_hisparse.selection import dense_attention
 
 
 @pytest.fixture(params=["cpu", "cuda:0"])
@@ -41,8 +42,8 @@ def test_unpinned_page_still_hits_until_actual_block_reuse(device):
     for name in ("a", "b"):
         cache.reserve(name, 64, 1)
     k, v = write(cache, "a", 12)
-    cache.synchronize()
-    page = cache.pages["a", 0, 0]
+    cache.storage.synchronize()
+    page = cache.storage.pages["a", 0, 0]
     slot = page.slot
     generation = cache.allocator.slots[slot].generation
     host = page.host_slot
@@ -57,7 +58,7 @@ def test_unpinned_page_still_hits_until_actual_block_reuse(device):
     torch.testing.assert_close(actual, dense_attention(q, k[:1], v[:1]))
     assert cache.snapshot()["row_stats"]["misses"] == 0
     write(cache, "b", 12)  # Empty blocks take priority over readable clean KV.
-    assert page.slot == slot and cache.stats["unpinned_block_reuses"] == 0
+    assert page.slot == slot and cache.storage.stats["unpinned_block_reuses"] == 0
     write(cache, "b", 1)  # No empties remain; now reuse the old A block.
     assert page.slot is None and page.host_slot == host
     assert cache.tables["a", 0].resident[0].item() == -1
@@ -76,14 +77,14 @@ def test_consumer_lease_temporarily_protects_a_readable_free_block(device):
     for name in ("a", "b"):
         cache.reserve(name, 64, 1)
     k, _ = write(cache, "a", 12)
-    cache.synchronize()
+    cache.storage.synchronize()
     cache.reclaim_history("a", 0)
-    page = cache.pages["a", 0, 0]
+    page = cache.storage.pages["a", 0, 0]
     slot = page.slot
     with cache.resolve("a", 0, select(cache, [0])) as lease:
         assert slot in cache.allocator.reclaimable
         assert slot not in cache._available_blocks()
-        if cache.cuda:
+        if cache.storage.cuda:
             torch.cuda._sleep(2_000_000)
         observed = cache.pool[slot, 0, 0].clone()
         write(cache, "b", 13)  # B must reclaim its own history instead.
@@ -103,12 +104,12 @@ def test_window_triggers_hot_without_memory_exhaustion(device):
     write(cache, "a", 4)
     tables = cache.tables["a", 0]
     assert tables.hot_required and tables.trigger == "window" and tables.blocks
-    assert cache.stats["evictions"] == 0
+    assert cache.storage.stats["evictions"] == 0
     assert len(cache.allocator.free) == 8
-    cache.synchronize()
+    cache.storage.synchronize()
     cache.collect()
     assert cache.page_state(("a", 0, 0))["residency"] == "clean_unpinned"
-    assert cache.pages["a", 0, 0].slot is not None
+    assert cache.storage.pages["a", 0, 0].slot is not None
     cache.assert_invariants()
 
 
@@ -120,7 +121,7 @@ def test_watermark_uses_projected_capacity_before_the_last_block(device):
     write(cache, "a", 4)
     assert cache.tables["a", 0].trigger == "watermark"
     assert cache.tables["a", 0].blocks
-    assert len(cache.allocator.free) == 2 and cache.stats["evictions"] == 0
+    assert len(cache.allocator.free) == 2 and cache.storage.stats["evictions"] == 0
     cache.assert_invariants()
 
 
@@ -147,20 +148,20 @@ def test_two_active_tails_survive_full_and_partial_page_boundaries(device):
     cache = make(device, pages=3, watermark=None)
     cache.reserve("a", 64, 1)
     write(cache, "a", 9)
-    assert cache.pages["a", 0, 0].slot is None
-    assert cache.pages["a", 0, 1].slot is not None
-    assert cache.pages["a", 0, 2].slot is not None
+    assert cache.storage.pages["a", 0, 0].slot is None
+    assert cache.storage.pages["a", 0, 1].slot is not None
+    assert cache.storage.pages["a", 0, 2].slot is not None
     write(cache, "a", 3)  # Last page seals; the preceding full page is still a tail.
-    assert cache.pages["a", 0, 1].slot is not None
+    assert cache.storage.pages["a", 0, 1].slot is not None
     write(cache, "a", 1)
-    assert cache.pages["a", 0, 1].slot is None
-    assert cache.pages["a", 0, 2].slot is not None
-    assert cache.pages["a", 0, 3].slot is not None
+    assert cache.storage.pages["a", 0, 1].slot is None
+    assert cache.storage.pages["a", 0, 2].slot is not None
+    assert cache.storage.pages["a", 0, 3].slot is not None
     cache.assert_invariants()
     small = make(device, pages=2)
     with pytest.raises(CapacityError, match="credits"):
         small.reserve("a", 64, 1)
-    assert not small.requests and not small.tables
+    assert not small.storage.requests and not small.tables
 
 
 def test_pending_mirror_is_not_clean_and_policy_tick_does_not_wait():
@@ -176,7 +177,7 @@ def test_pending_mirror_is_not_clean_and_policy_tick_does_not_wait():
     cache = make("cpu", pages=6)
     cache.reserve("a", 64, 1)
     write(cache, "a", 12)
-    page = cache.pages["a", 0, 0]
+    page = cache.storage.pages["a", 0, 0]
     completion = Completion()
     page.host_ready = completion
     page.host_committed_version = 0
@@ -200,16 +201,16 @@ def test_cuda_page_is_not_unpinned_before_its_d2h_event_completes():
     cache = make("cuda:0", pages=8)
     cache.reserve("a", 64, 1)
     k, v = [torch.randn(12, 1, 8, device=cache.device) for _ in range(2)]
-    cache.synchronize()
-    with torch.cuda.stream(cache.transfer):
+    cache.storage.synchronize()
+    with torch.cuda.stream(cache.storage.transfer):
         torch.cuda._sleep(100_000_000)
     cache.write("a", 0, k, v)
-    page = cache.pages["a", 0, 0]
+    page = cache.storage.pages["a", 0, 0]
     cache.transition_to_host("a", 0)
     assert not page.host_ready.query()
     assert page.slot not in cache.allocator.reclaimable
-    assert cache.stats["pressure_mirror_waits"] == 0
-    cache.synchronize()
+    assert cache.storage.stats["pressure_mirror_waits"] == 0
+    cache.storage.synchronize()
     cache.collect()
     assert cache.page_state(page.key)["residency"] == "clean_unpinned"
     cache.assert_invariants()
@@ -233,18 +234,18 @@ def test_pressure_waits_only_for_an_eligible_mirror_event():
     # All blocks resident; a hot region and a new tail require completed history.
     completions = []
     for index in (0, 1):
-        page = cache.pages["a", 0, index]
+        page = cache.storage.pages["a", 0, index]
         event = Completion()
         page.host_ready, page.host_committed_version = event, 0
         cache.pending_clean.add(page.key)
         completions.append(event)
-    original_wait = cache._wait
-    cache._wait = lambda stream, event: None  # CPU completion test double only
+    original_wait = cache.storage.wait
+    cache.storage.wait = lambda stream, event: None  # CPU completion test double only
     write(cache, "a", 1)
     assert sum(e.waits for e in completions) >= 1
-    assert cache.stats["pressure_mirror_waits"] >= 1
-    for page in cache.pages.values():
+    assert cache.storage.stats["pressure_mirror_waits"] >= 1
+    for page in cache.storage.pages.values():
         page.host_ready = None
-    cache._wait = original_wait
+    cache.storage.wait = original_wait
     cache.release_request("a")
     cache.assert_invariants()

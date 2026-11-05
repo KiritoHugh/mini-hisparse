@@ -62,7 +62,7 @@ def _attention_window(
 
 
 def triton_chunk(query, lease, mask=None):
-    cfg = lease.cache.config
+    cfg = lease.store.config
     if query.stride(-1) != 1:
         query = query.contiguous()
     slots = torch.tensor([p.slot for p in lease.pages], dtype=torch.int32, pin_memory=True).to(
@@ -76,7 +76,7 @@ def triton_chunk(query, lease, mask=None):
     accumulator = torch.empty(query.shape, device=query.device, dtype=torch.float32)
     _attention_window[(query.shape[0],)](
         query,
-        lease.cache.pool,
+        lease.store.pool,
         slots,
         lengths,
         mask,

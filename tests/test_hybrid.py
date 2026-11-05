@@ -3,13 +3,13 @@ from dataclasses import replace
 import pytest
 import torch
 
-from mini_hisparse.attention import dense_attention, paged_attention
-from mini_hisparse.cache import CacheConfig, CapacityError
+from mini_hisparse.attention import row_attention
+from mini_hisparse.config import CacheConfig, CapacityError
 from mini_hisparse.engine import Engine
-from mini_hisparse.hybrid import HotConfig, HybridKVCache, row_attention
+from mini_hisparse.hybrid import HotConfig, HybridKVCache
 from mini_hisparse.model import MiniModel, ModelConfig
 from mini_hisparse.row_index import LogicalTopK, resolve_rows
-from mini_hisparse.selection import Selection, selection_oracle
+from mini_hisparse.selection import Selection, dense_attention, selection_oracle
 
 
 @pytest.fixture(params=["cpu", "cuda:0"])
@@ -90,7 +90,7 @@ def test_late_hits_are_protected_and_lru_replaces_only_unselected_rows(device):
         )
     assert cache.snapshot()["row_stats"]["misses"] == 5
     tables = cache.tables["a", 0]
-    tag0 = cache.pages["a", 0, 0].host_slot * 4
+    tag0 = cache.storage.pages["a", 0, 0].host_slot * 4
     assert tag0 not in tables.tags.tolist()
     cache.assert_invariants()
 
@@ -107,14 +107,14 @@ def test_per_head_token_masks_and_noncontiguous_hot_blocks(device):
         write(cache, "a", 3)
         write(cache, "b", 3)
     write(cache, "b", 3)
-    cache.synchronize()
+    cache.storage.synchronize()
     cache.transition_to_host("a", 0)
     assert cache.tables["a", 0].blocks == [7, 0]
     write(cache, "a", 18)
-    k, v = [x.to(device) for x in cache.host_kv("a", 0)]
+    k, v = [x.to(device) for x in cache.storage.host_kv("a", 0)]
     q = torch.randn(4, 8, device=device)
     selection = Selection.from_tokens([[0, 7], [2], [7, 11], [19, 0]], 27, 3, 4)
-    actual = paged_attention(q, cache, "a", 0, selection=selection)
+    actual = cache.attention(q, "a", 0, selection=selection)
     expected, _ = selection_oracle(q, k, v, selection)
     torch.testing.assert_close(actual, expected, atol=2e-6, rtol=2e-5)
     cache.assert_invariants()
@@ -126,7 +126,7 @@ def test_capacity_admission_and_topk_overflow_are_atomic(device):
     before = cache.index_bytes
     with pytest.raises(CapacityError, match="credits"):
         cache.reserve("b", 40, 1)
-    assert "b" not in cache.requests and cache.index_bytes == before
+    assert "b" not in cache.storage.requests and cache.index_bytes == before
     write(cache)
     old = cache.tables["a", 0].tags.clone()
     with pytest.raises(ValueError, match="max_union_rows"):
@@ -143,7 +143,7 @@ def test_index_tables_are_charged_to_budget(device):
     tiny = make(device, index_budget_bytes=needed - 1)
     with pytest.raises(CapacityError, match="index budget"):
         tiny.reserve("a", 40, 1)
-    assert not tiny.requests and not tiny.tables
+    assert not tiny.storage.requests and not tiny.tables
     exact = make(device, index_budget_bytes=needed)
     exact.reserve("a", 40, 1)
     assert exact.index_bytes == needed
@@ -165,9 +165,9 @@ def test_active_tail_and_row_lease_lifetime(device):
         write(cache, length=1)
     lease.release()
     write(cache, length=1)
-    assert cache.pages["a", 0, 8].slot is not None
-    assert cache.pages["a", 0, 7].slot is not None
-    assert cache.pages["a", 0, 6].slot is None
+    assert cache.storage.pages["a", 0, 8].slot is not None
+    assert cache.storage.pages["a", 0, 7].slot is not None
+    assert cache.storage.pages["a", 0, 6].slot is None
     cache.assert_invariants()
     cache.release_request("a")
     with pytest.raises(RuntimeError, match="released"):
@@ -227,12 +227,12 @@ def test_cuda_deferred_reuse_keeps_host_and_hot_readers_alive():
         torch.cuda._sleep(2_000_000)
         row = lease.plan.physical_rows[0]
         actual = cache.pool[row // 4, 0, row % 4].clone()
-    old_hosts = {p.host_slot for p in cache.pages.values()}
+    old_hosts = {p.host_slot for p in cache.storage.pages.values()}
     cache.release_request("same", wait=False)
     cache.reserve("same", 40, 1)
     write(cache, "same")
-    if cache.retired:
-        assert old_hosts.isdisjoint({p.host_slot for p in cache.pages.values()})
+    if cache.storage.retired:
+        assert old_hosts.isdisjoint({p.host_slot for p in cache.storage.pages.values()})
     torch.testing.assert_close(actual, k[0])
     cache.release_request("same")
     cache.assert_invariants()
@@ -266,7 +266,7 @@ def test_engine_waits_for_hot_capacity_and_never_reprefills(device):
     outputs = engine.run()
     assert all(len(tokens) == 5 for tokens in outputs.values())
     assert all(r.prefill_count == 1 and r.decode_count == 4 for r in engine.requests.values())
-    assert not cache.requests and not cache.tables and not any(cache.owners)
+    assert not cache.storage.requests and not cache.tables and not any(cache.owners)
     cache.assert_invariants()
 
 

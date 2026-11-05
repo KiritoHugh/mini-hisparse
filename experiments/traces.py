@@ -9,8 +9,9 @@ from statistics import mean
 
 import torch
 
-from .cache import CacheConfig, PagedKVCache
-from .selection import Selection, quest_selection, selection_oracle
+from mini_hisparse.selection import Selection, quest_selection, selection_oracle
+from reference.cache import PagedConfig as CacheConfig
+from reference.cache import PagedKVCache
 
 
 class Recorder:

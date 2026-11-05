@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from math import ceil
+from math import ceil, sqrt
 
 import torch
 
@@ -124,3 +124,40 @@ def selection_oracle(query, k, v, selection):
         "union_pages": len(selection.pages),
     }
     return sparse.to(query.dtype), metrics
+
+
+def select_pages(
+    cache, request_id: str, layer: int, query: torch.Tensor, top_k: int | None
+) -> list[int]:
+    """A small page-mean indexer for demonstrations, NOT the learned DSA indexer.
+
+    None selects the full causal history. Sparse mode keeps the first and last
+    page (within its budget), then uses query/mean-key scores for the remainder.
+    """
+    request = cache.storage.requests[request_id]
+    count = ceil(request.lengths[layer] / cache.config.page_size)
+    if count == 0:
+        raise ValueError("cannot attend to empty KV")
+    if top_k is None or top_k >= count:
+        return list(range(count))
+    if top_k < 1:
+        raise ValueError("top_k must be positive or None")
+    required = [count - 1] if top_k == 1 else [0, count - 1]
+    if top_k == len(required):
+        return sorted(required)
+    groups = query.shape[0] // cache.config.kv_heads
+    grouped_query = query.float().reshape(cache.config.kv_heads, groups, -1).mean(1)
+    scores = torch.einsum("hd,phd->p", grouped_query, request.summaries[layer, :count])
+    scores[required] = -torch.inf
+    # Deliberate reference-control-plane synchronization; a production fused
+    # resolver keeps these indices and the residency table entirely on GPU.
+    chosen = scores.topk(top_k - len(required)).indices.tolist()
+    return sorted(required + chosen)
+
+
+def dense_attention(query: torch.Tensor, k: torch.Tensor, v: torch.Tensor):
+    """Independent full-KV oracle, also useful for correctness tests."""
+    groups = query.shape[0] // k.shape[1]
+    k, v = k.repeat_interleave(groups, 1), v.repeat_interleave(groups, 1)
+    scores = torch.einsum("hd,thd->ht", query.float(), k.float()) / sqrt(query.shape[-1])
+    return torch.einsum("ht,thd->hd", scores.softmax(-1), v.float()).to(query.dtype)

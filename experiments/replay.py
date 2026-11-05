@@ -8,10 +8,11 @@ from time import perf_counter
 
 import torch
 
-from .attention import paged_attention
-from .cache import CacheConfig, PagedKVCache
-from .hybrid import HotConfig, HybridKVCache
-from .selection import Selection, selection_oracle
+from mini_hisparse.hybrid import HotConfig, HybridKVCache
+from mini_hisparse.selection import Selection, selection_oracle
+from reference.cache import PagedConfig as CacheConfig
+from reference.cache import PagedKVCache
+
 from .traces import choose, validate_trace
 
 
@@ -48,6 +49,8 @@ def prepare(trace, page_size, selection_budget, selector, device):
 
 @torch.inference_mode()
 def replay(trace, events, config: CacheConfig, hot: HotConfig | None = None):
+    if hot is None:
+        config = CacheConfig(**vars(config))
     # Sparse captured layers are compacted into this cache's layer dimension.
     layer_ids = sorted({r["layer"] for r in trace["prefills"]})
     layer_map = {layer: i for i, layer in enumerate(layer_ids)}
@@ -70,19 +73,24 @@ def replay(trace, events, config: CacheConfig, hot: HotConfig | None = None):
     # Warm mask/window specialization without changing logical KV history.
     first = trace["prefills"][0]
     query = events[0]["q"]
-    warm_pages = min(cache.window_pages, ceil(len(first["k"]) / config.page_size))
-    if hot:
-        warm_pages = min(warm_pages, hot.max_union_rows // config.page_size)
+    # Preserve the published four-page warmup for the hybrid trace baseline;
+    # it no longer borrows a window policy from the page-cache implementation.
+    warm_limit = (
+        min(4, max(1, cache.budget // 2), hot.max_union_rows // config.page_size)
+        if hot
+        else cache.window_pages
+    )
+    warm_pages = min(warm_limit, ceil(len(first["k"]) / config.page_size))
     for width in range(1, warm_pages + 1):
         warm = Selection.from_pages(
             list(range(width)), len(first["k"]), config.page_size, query.shape[0], "warmup"
         )
-        paged_attention(query, cache, first["request"], layer_map[first["layer"]], selection=warm)
-    if hot and cache.cuda:
+        cache.attention(query, first["request"], layer_map[first["layer"]], selection=warm)
+    if hot and cache.storage.cuda:
         # Row kernels specialize on selected widths, including partial tails.
         # Compile every measured shape without changing any cache contents.
-        from .row_index import RowPlan
-        from .row_kernels import attend_rows, gather_rows
+        from mini_hisparse.row_index import RowPlan
+        from mini_hisparse.row_kernels import attend_rows, gather_rows
 
         warmed = set()
         for event in events:
@@ -98,25 +106,25 @@ def replay(trace, events, config: CacheConfig, hot: HotConfig | None = None):
             plan = RowPlan(rows, empty, empty, cache.row_stats)
             gather_rows(cache._host_pointer, cache.pool, plan, config)
             attend_rows(event["q"], cache.pool, rows, config)
-    cache.synchronize()
+    cache.storage.synchronize()
     if hot:
         cache.reset_stats()
     else:
-        cache.stats.clear()
+        cache.storage.stats.clear()
     observed, timings = [], []
     per_request = {name: Counter() for name in request_names}
     for event in events:
         name, layer = event["request"], layer_map[event["layer"]]
-        cache.synchronize()
-        before = cache.stats.copy()
+        cache.storage.synchronize()
+        before = cache.storage.stats.copy()
         before_rows = cache.row_stats.clone() if hot else None
         started = perf_counter()
         cache.write(name, layer, event["k"], event["v"])
-        output = paged_attention(event["q"], cache, name, layer, selection=event["selection"])
-        cache.synchronize()
+        output = cache.attention(event["q"], name, layer, selection=event["selection"])
+        cache.storage.synchronize()
         timings.append((perf_counter() - started) * 1000)
         observed.append(output.cpu())
-        per_request[name].update(cache.stats - before)
+        per_request[name].update(cache.storage.stats - before)
         if hot:
             counts = (cache.row_stats - before_rows).cpu().tolist()
             per_request[name].update(

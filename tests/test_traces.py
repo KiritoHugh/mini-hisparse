@@ -3,9 +3,10 @@ import copy
 import pytest
 import torch
 
-from mini_hisparse.cache import CacheConfig
-from mini_hisparse.replay import prepare, replay
-from mini_hisparse.traces import analyze, load_trace, validate_trace
+from experiments.replay import prepare, replay
+from experiments.traces import analyze, load_trace, validate_trace
+from mini_hisparse.config import CacheConfig
+from mini_hisparse.hybrid import HotConfig
 
 
 def fixture_trace():
@@ -41,12 +42,21 @@ def test_trace_validation_safe_round_trip_and_replay(tmp_path):
         metrics = summary["summary"][mode]
         assert 0 < metrics["retained_attention_mass"] <= 1
         events = prepare(loaded, 4, 1, mode, "cpu")
-        result = replay(
-            loaded,
-            events,
-            CacheConfig(gpu_pages=1, page_size=4, kv_heads=1, head_dim=8, device="cpu"),
-        )
-        assert result["max_storage_abs_error"] < 1e-5
+        union = max(len({t for row in e["selection"].positions for t in row}) for e in events)
+        for hot in (None, HotConfig(union)):
+            result = replay(
+                loaded,
+                events,
+                CacheConfig(
+                    gpu_pages=hot.admission_blocks(4) if hot else 1,
+                    page_size=4,
+                    kv_heads=1,
+                    head_dim=8,
+                    device="cpu",
+                ),
+                hot,
+            )
+            assert result["max_storage_abs_error"] < 1e-5
     broken = copy.deepcopy(trace)
     broken["events"][1]["position"] += 1
     with pytest.raises(ValueError, match="monotonic"):

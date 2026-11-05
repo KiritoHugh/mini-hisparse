@@ -2,7 +2,7 @@
 
 本页是 2026-11-04 初版的历史结果。2026-11-05 改进后的真实轨迹、策略对照与当前测试结果见 [第一轮](round1-review.md) 与 [第二轮](round2-review.md)，不要混用两版的索引大小、默认 selector 和逐出策略。
 
-后续默认路径已改为 hybrid block leases / token-row replacement，当前 **93 项测试通过**。Row 管理的历史实测见 [HiSparse 对齐报告](../hybrid-alignment.md)；clean page、hot 触发和两页 tail 的最新验证见 [residency 对齐报告](../residency-alignment.md)。
+后续默认路径已改为 hybrid block leases / token-row replacement，当时 **93 项测试通过**。Row 管理的历史实测见 [HiSparse 对齐报告](../hybrid-alignment.md)；clean page、hot 触发和两页 tail 的最新验证见 [residency 对齐报告](../residency-alignment.md)。
 
 测试日期：2026-11-04。单卡 **NVIDIA A100-SXM4-40GB**，Python 3.11，PyTorch `2.15.0+cu132`，Triton `3.9.0`，Transformers `5.22.1`。完整 Python 依赖见 [requirements-tested.txt](../../requirements-tested.txt)。
 

@@ -1,7 +1,7 @@
-"""Mini-HiSparse: bounded device KV storage, without request-level swapping."""
+"""Mini-HiSparse: bounded GPU KV storage without request-level swapping."""
 
-from .cache import CacheConfig, PagedKVCache
+from .config import CacheConfig
 from .hybrid import HotConfig, HybridKVCache
 from .row_index import LogicalTopK
 
-__all__ = ["CacheConfig", "HotConfig", "HybridKVCache", "LogicalTopK", "PagedKVCache"]
+__all__ = ["CacheConfig", "HotConfig", "HybridKVCache", "LogicalTopK"]

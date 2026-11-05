@@ -13,8 +13,7 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 
-from .attention import paged_attention, select_pages
-from .selection import quest_selection
+from .selection import Selection, quest_selection, select_pages
 
 
 @dataclass
@@ -162,7 +161,7 @@ class MiniModel(nn.Module):
     def prefill(self, tokens: list[int], cache=None, request_id=None, observer=None):
         if not tokens:
             raise ValueError("prompt cannot be empty")
-        if cache is not None and any(cache.requests[request_id].lengths):
+        if cache is not None and any(cache.storage.requests[request_id].lengths):
             raise ValueError("prefill is allowed exactly once per request")
         x = self.model.embed_tokens(torch.tensor(tokens, device=self.device))
         for index, layer in enumerate(self.model.layers):
@@ -192,7 +191,7 @@ class MiniModel(nn.Module):
         selector="quest",
         observer=None,
     ):
-        lengths = cache.requests[request_id].lengths
+        lengths = cache.storage.requests[request_id].lengths
         if len(set(lengths)) != 1 or lengths[0] == 0:
             raise ValueError("all layers must have the same nonempty history")
         position = lengths[0]
@@ -203,7 +202,7 @@ class MiniModel(nn.Module):
             if observer is not None:
                 observer.decode(request_id, index, q[0], k, v)
             if selector == "quest" and top_k is not None:
-                request = cache.requests[request_id]
+                request = cache.storage.requests[request_id]
                 selection = quest_selection(
                     q[0],
                     request.minimum[index],
@@ -212,13 +211,16 @@ class MiniModel(nn.Module):
                     cache.config.page_size,
                     top_k,
                 )
-                attention = paged_attention(
-                    q[0], cache, request_id, index, backend=backend, selection=selection
-                )
             elif selector in ("quest", "mean"):
                 pages = select_pages(cache, request_id, index, q[0], top_k)
-                attention = paged_attention(q[0], cache, request_id, index, pages, backend)
+                selection = Selection.from_pages(
+                    pages,
+                    cache.storage.requests[request_id].lengths[index],
+                    cache.config.page_size,
+                    q.shape[1],
+                )
             else:
                 raise ValueError("selector must be quest or mean")
+            attention = cache.attention(q[0], request_id, index, selection, backend)
             x = self._finish(layer, x, attention.unsqueeze(0))
         return self.lm_head(self.model.norm(x[0])).float()
