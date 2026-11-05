@@ -4,6 +4,8 @@
 
 **Row cache 的收益取决于选中 token 的分布。** 本次 A100 测量中，Quest 整页选择下 hybrid 比页级缓存多搬数据、耗时更高；分散 token 选择下，hybrid 明显降低搬运量和层级回放耗时。两组选择预算不同，应在各自组内比较存储布局，不能把它们相互比较为“模型加速”。
 
+进一步追问“hot 留多少”可看 [固定总容量的 hot sweep](hot-capacity.md)：比较 1U / 1.5U / 2U，同时固定触发阈值，并标出不可准入配置。三道面试问题的实现、证据和剩余边界汇总在 [interview.md](interview.md)。
+
 ![相同 selection 下的 H2D 搬运量和单层耗时；resident 使用额外 KV 容量](assets/layout-comparison.svg)
 
 图由 [plot_comparison.py](../scripts/plot_comparison.py) 直接读取原始 JSON 生成。误差线表示五次 run median 的最小/最大值，不是置信区间。

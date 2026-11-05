@@ -10,6 +10,8 @@ This is an educational systems project with real PyTorch execution and Triton ke
 
 **Reading path:** [illustrated design](docs/visual-guide.md) → [code walkthrough](docs/code-walkthrough.md) → [runnable examples](docs/examples.md) → [baseline comparisons](docs/benchmarks.md). These tutorials are in Chinese; [Architecture](docs/design.md) and [Validation](docs/validation.md) provide English references.
 
+The [interview answers and assessment](docs/interview.md) connect page states, shared-pool allocation and asynchronous attention to the code, progress conditions and test evidence. The [hot-capacity study](docs/hot-capacity.md) explains why the default `2U` is a tradeoff rather than a minimum or an optimum.
+
 ## What is implemented
 
 - **Page ownership and row contents are separate.** The allocator leases blocks; each request/layer manages its hot token rows with tags and LRU replacement.
@@ -122,7 +124,7 @@ python scripts/model_trace.py analyze
 python scripts/replay_trace.py
 ```
 
-The recorded A100 validation has **94 passing tests**, a 32-token Qwen2.5 greedy-generation match with Hugging Face (`prefill_count=1`), and 96 real model-trace events checked against the same-selection oracle. [Validation](docs/validation.md) identifies configurations, raw reports and measurement limits. GitHub CI runs CPU checks; GPU checks are run separately.
+The recorded A100 validation has **96 passing tests**, including continued append/attention at the minimum hot/tail footprint when every selected historical row misses. A 32-token Qwen2.5 greedy-generation check matches Hugging Face (`prefill_count=1`), and real model-trace replay checks 96 layer events per run against the same-selection oracle. [Validation](docs/validation.md) identifies configurations, raw reports and measurement limits. GitHub CI runs CPU checks; GPU checks are run separately.
 
 Raw datasets, weights and tensor traces are not included. Trace results use frozen dense-teacher activations with explicit sparse selection; they are not native DSA traces, end-to-end LongBench scores or serving-throughput measurements.
 

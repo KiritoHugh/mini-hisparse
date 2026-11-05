@@ -164,6 +164,34 @@ def test_two_active_tails_survive_full_and_partial_page_boundaries(device):
     assert not small.storage.requests and not small.tables
 
 
+def test_minimum_hot_capacity_progresses_when_every_selected_row_misses(device):
+    """H=U needs no spare row: protect zero hits, replace all slots, then cross tails."""
+    torch.manual_seed(29)
+    cache = make(device, pages=3, watermark=None)  # one hot block + two tails
+    cache.reserve("a", 64, 1)
+    k, v = write(cache, "a", 32)
+    cache.reset_stats()
+    choices = ([0, 4, 8, 12], [1, 5, 9, 13])
+    for step in range(16):
+        new_k, new_v = write(cache, "a", 1)
+        k, v = torch.cat((k, new_k)), torch.cat((v, new_v))
+        positions = choices[step % 2]
+        assert all(cache.storage.pages["a", 0, t // 4].slot is None for t in positions)
+        q = torch.randn(2, 8, device=device)
+        actual = row_attention(q, cache, "a", 0, select(cache, positions))
+        torch.testing.assert_close(
+            actual, dense_attention(q, k[positions], v[positions]), atol=3e-6, rtol=3e-5
+        )
+        tail = (len(k) - 1) // 4
+        assert all(cache.storage.pages["a", 0, p].slot is not None for p in (tail - 1, tail))
+        cache.assert_invariants()
+    assert cache.row_stats.tolist() == [0, 0, 64]
+    assert cache.storage.requests["a"].lengths == [48]
+    assert cache.storage.stats["peak_device_pages"] <= 3
+    cache.release_request("a")
+    cache.assert_invariants()
+
+
 def test_pending_mirror_is_not_clean_and_policy_tick_does_not_wait():
     class Completion:
         done = False

@@ -11,7 +11,7 @@
 | 3 | [三个可运行例子](examples.md) | 怎样检查索引、观察多请求竞争、用真实 Qwen 询问本地文档？ |
 | 4 | [当前 baseline 对比](benchmarks.md) | 与全驻留/页缓存相比何时获益，何时更慢，结果怎样复现？ |
 
-如果时间有限：面试讲解先看 [五分钟路线](interview.md)；调试地址先跑 [inspect_indices.py](../examples/inspect_indices.py)；检查数值与生命周期看 [Validation](validation.md)。
+如果时间有限：面试讲解先看 [三问详答、进展条件与改进评估](interview.md)；调试地址先跑 [inspect_indices.py](../examples/inspect_indices.py)；检查数值与生命周期看 [Validation](validation.md)。
 
 ## 按问题查设计细节
 
@@ -19,6 +19,7 @@
 |---|---|
 | [Architecture](design.md) | Page/block/row identities, address translation, ownership and execution order |
 | [Validation](validation.md) | Current reproducible checks, recorded hardware and numerical results |
+| [Hot 容量敏感性](hot-capacity.md) | 固定总容量比较 1U / 1.5U / 2U，解释最低工作集与性能取舍 |
 | [HiSparse alignment](hybrid-alignment.md) | Hot block leases, GPU row replacement and differences from vLLM |
 | [Residency alignment](residency-alignment.md) | Clean-page unpin/reuse, hot triggers and two active tail pages |
 | [Trace format](traces.md) | Dataset provenance, model activation capture, selection semantics and replay |

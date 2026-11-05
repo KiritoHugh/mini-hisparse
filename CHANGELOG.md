@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Expand the three interview answers with exact page/row state transitions, victim policy, conditional progress reasoning and asynchronous execution limits.
+- Add a fixed-capacity hot-size sweep and recorded A100 results, including infeasible admission configurations; add CPU/CUDA worst-case all-miss progress coverage at the minimum hot/tail footprint.
+
 - Organize documentation into illustrated design, code walkthrough, runnable examples and current baseline comparisons.
 - Add executable address translation and local-document Qwen examples; include the CPU address example in CI.
 - Extend frozen-trace comparisons with an all-resident control, rotating repeat order and provenance; publish current two-tail A100 reports and a reproducible SVG plot.

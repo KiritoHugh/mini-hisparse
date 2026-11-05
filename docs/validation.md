@@ -16,9 +16,11 @@ python scripts/inspect_residency.py --device cpu
 python examples/inspect_indices.py --device cpu
 ```
 
-The recorded GPU suite has **94 passing tests**. Coverage includes CPU/CUDA output agreement, GQA and per-head selection, duplicate/invalid token handling, hot LRU protection, fragmented block leases, clean-page completion and reuse, two-tail boundaries, admission failure, request cancellation/ID reuse, delayed readers and standalone resolver CUDA Graph capture.
+The recorded GPU suite has **96 passing tests**. Coverage includes CPU/CUDA output agreement, GQA and per-head selection, duplicate/invalid token handling, hot LRU protection, fragmented block leases, clean-page completion and reuse, two-tail boundaries, admission failure, request cancellation/ID reuse, delayed readers and standalone resolver CUDA Graph capture.
 
-The refactored runtime run with CUDA hidden passed **53 CPU tests**, with **41 CUDA cases skipped**. Wheel and source distributions built successfully; the installed wheel also ran the three-request CPU demo from outside the source tree.
+The interview review adds CPU/CUDA cases for `H=U=4` with only three GPU blocks: one hot block and two tails. After a 32-token prefill, 16 consecutive appends alternate disjoint selections of four host-only rows. All 64 selected rows miss, every attention output matches its same-selection oracle, and the two tails remain resident across page boundaries. See `test_minimum_hot_capacity_progresses_when_every_selected_row_misses` in [test_residency.py](../tests/test_residency.py). This is a progress/correctness test, not a latency measurement.
+
+The earlier refactor validation with CUDA hidden passed **53 CPU tests**, with **41 CUDA cases skipped**, before the two new cases above. Wheel and source distributions built successfully; the installed wheel also ran the three-request CPU demo from outside the source tree.
 
 CPU-only environments skip CUDA cases. The optional Hugging Face test uses a tiny randomly initialized Qwen2 model and a temporary local checkpoint; it does not download pretrained weights. CI installs the `models` extra and runs with the Hugging Face hub offline. CPU CI is not evidence of CUDA kernel correctness.
 

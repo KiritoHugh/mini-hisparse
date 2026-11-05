@@ -17,7 +17,8 @@
 | 如何演示或接入应用？ | [可运行例子](docs/examples.md)：索引检查、小池多请求、真实文档问答 |
 | 相比 baseline 有什么收益和代价？ | [当前测评](docs/benchmarks.md)：全驻留 / 页缓存 / hybrid，原始数据和复现命令 |
 | 与 vLLM 对齐到哪里？ | [索引与 hot 对齐](docs/hybrid-alignment.md)、[驻留生命周期对齐](docs/residency-alignment.md) |
-| 如何回答面试追问？ | [五分钟讲解路线](docs/interview.md) |
+| 如何回答面试追问？ | [三问详答、进展条件与改进评估](docs/interview.md) |
+| Hot 为什么默认 2U，能不能更小？ | [固定总容量的敏感性实验](docs/hot-capacity.md) |
 
 ```mermaid
 flowchart LR
@@ -121,7 +122,7 @@ docs/           图解教程、设计参考、测评和历史记录
 
 `HybridKVCache` 组合 `HostStore` 与 `DeviceAllocator`，不继承旧页缓存。默认 `model.decode()` 直接调用 `cache.attention()`。[代码阅读路线](docs/code-walkthrough.md) 和 [0.2 API 迁移](docs/refactor.md) 说明职责边界。
 
-已记录 A100 **94 项测试通过**；强制回收合格历史页后，Qwen2.5 的 32 个生成 token 与 Hugging Face 完全一致，prefill 只有一次。当前比较的每个 trace event 均通过相同 selection 的数值校验。[验证证据](docs/validation.md)。GitHub CI 检查 CPU 路径，GPU 另行验证。
+已记录 A100 **96 项测试通过**，包括最低 hot/tail 配额下每步全 miss 仍持续追加和 attention。强制回收合格历史页后，Qwen2.5 的 32 个生成 token 与 Hugging Face 完全一致，prefill 只有一次。当前比较的每个 trace event 均通过相同 selection 的数值校验。[验证证据](docs/validation.md)。GitHub CI 检查 CPU 路径，GPU 另行验证。
 
 ```bash
 python -m pytest -q
