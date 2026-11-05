@@ -1,12 +1,14 @@
 # mini-hisparse
 
-[中文](README.zh-CN.md) · [Architecture](docs/design.md) · [Validation](docs/validation.md) · [Documentation](docs/README.md)
+[中文](README.zh-CN.md) · [Visual guide](docs/visual-guide.md) · [Examples](docs/examples.md) · [Benchmarks](docs/benchmarks.md) · [Documentation](docs/README.md)
 
 A small, readable inference engine that keeps decoding when only part of a request's KV cache fits on the GPU. Inspired by vLLM/SGLang HiSparse and the minimal organization of nano-vLLM.
 
 The complete KV history has host backing. Resident pages and reusable hot buffers share **one GPU tensor**. At each decode step, selected logical token IDs resolve to resident rows or hot slots; only missing rows are loaded from pinned host memory. Requests continue without restoring their entire KV history or repeating prefill.
 
 This is an educational systems project with real PyTorch execution and Triton kernels. The pretrained model adapter supports Qwen2/2.5 GQA; the sparse selector is a Quest-style approximation, not a learned DeepSeek DSA indexer.
+
+**Reading path:** [illustrated design](docs/visual-guide.md) → [code walkthrough](docs/code-walkthrough.md) → [runnable examples](docs/examples.md) → [baseline comparisons](docs/benchmarks.md). These tutorials are in Chinese; [Architecture](docs/design.md) and [Validation](docs/validation.md) provide English references.
 
 ## What is implemented
 
@@ -45,6 +47,7 @@ python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
 python -m pip install -e '.[dev]'
 
 mini-hisparse demo --device cpu --top-k 2 --prompt-tokens 257 --gpu-pages 12
+python examples/inspect_indices.py
 python scripts/inspect_residency.py --device cpu
 ```
 
@@ -73,6 +76,16 @@ python scripts/validate_pretrained.py --force-host
 
 The first run downloads model weights. `--top-k all` uses full attention; `--top-k 4` selects approximately four pages per query head and can change model quality. A page budget is not the same as a token-row budget or the union across heads.
 
+For an application example that reads a local document and computes its host/hot admission budgets:
+
+```bash
+python examples/long_context_chat.py --context docs/design.md \
+  --question 'Why keep two tail pages resident? Answer briefly.' \
+  --device cuda:0 --output results/document-chat.json
+```
+
+The [example guide](docs/examples.md) explains truncation, output counters and how to vary the KV budget.
+
 ## Capacity and configuration
 
 The default `hybrid` path gives every admitted request/layer a fixed hot-region credit plus two tail blocks:
@@ -99,8 +112,8 @@ Resident history may borrow unused credits. Hot blocks are physically allocated 
 
 ```bash
 python -m pytest -q
-python -m ruff check mini_hisparse reference experiments scripts tests
-python -m ruff format --check mini_hisparse reference experiments scripts tests
+python -m ruff check mini_hisparse reference experiments scripts examples tests
+python -m ruff format --check mini_hisparse reference experiments scripts examples tests
 
 # Optional: download a pinned LongBench sample and capture a real model trace.
 python scripts/prepare_longbench.py
@@ -113,6 +126,14 @@ The recorded A100 validation has **94 passing tests**, a 32-token Qwen2.5 greedy
 
 Raw datasets, weights and tensor traces are not included. Trace results use frozen dense-teacher activations with explicit sparse selection; they are not native DSA traces, end-to-end LongBench scores or serving-throughput measurements.
 
+## Baseline comparisons
+
+![H2D payload and serialized layer timings for three layouts](docs/assets/layout-comparison.svg)
+
+Five repeats on an A100, 96 frozen Qwen layer events, current two-tail runtime. Within each selection workload, `pages` and `hybrid` have identical GPU KV capacity; `resident` uses extra memory and the page-reference attention backend. It is a no-reload control, not an optimized latency bound.
+
+The result depends on access shape: hybrid transfers **more** data for Quest page selections, while dispersed offline-oracle token selections benefit from row loading. The [benchmark report](docs/benchmarks.md) includes raw JSON, memory/index budgets, numerical errors, timing boundaries and reproduction commands. These are storage-path experiments, not serving speedup claims.
+
 ## Reading the code
 
 The runtime package contains only the hybrid execution path. `HybridKVCache`
@@ -124,6 +145,7 @@ mini_hisparse/   hybrid runtime, storage, row resolver/kernels, model and engine
 reference/      optional page replacement and bounded-window attention
 experiments/    benchmark, model trace capture/analysis and replay
 scripts/        runnable experiment and validation entry points
+examples/       address translation and a local-document Qwen application
 tests/          runtime, reference and dependency-boundary checks
 ```
 

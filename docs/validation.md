@@ -2,15 +2,18 @@
 
 These results describe the default hybrid implementation with readable-unpinned clean pages and **two active tail pages**. Earlier page-based and one-tail experiments are archived separately; their capacity and timing numbers are not interchangeable.
 
+For current all-resident/page/hybrid comparisons, plots, timing methodology and reproduction commands, see [baseline benchmarks](benchmarks.md). This page focuses on numerical correctness and lifetime checks.
+
 ## Reproducible checks
 
 ```bash
 python -m pip install -e '.[dev,models]'
 python -m pytest -q
-python -m ruff check mini_hisparse reference experiments scripts tests
-python -m ruff format --check mini_hisparse reference experiments scripts tests
+python -m ruff check mini_hisparse reference experiments scripts examples tests
+python -m ruff format --check mini_hisparse reference experiments scripts examples tests
 python -m build
 python scripts/inspect_residency.py --device cpu
+python examples/inspect_indices.py --device cpu
 ```
 
 The recorded GPU suite has **94 passing tests**. Coverage includes CPU/CUDA output agreement, GQA and per-head selection, duplicate/invalid token handling, hot LRU protection, fragmented block leases, clean-page completion and reuse, two-tail boundaries, admission failure, request cancellation/ID reuse, delayed readers and standalone resolver CUDA Graph capture.

@@ -28,6 +28,7 @@ Issues = "https://github.com/KiritoHugh/mini-hisparse/issues"
 [project.optional-dependencies]
 dev = ["pytest>=8", "ruff>=0.9", "build>=1.2"]
 models = ["transformers>=4.46,<6", "safetensors", "huggingface-hub"]
+plots = ["matplotlib>=3.7"]
 
 [project.scripts]
 mini-hisparse = "mini_hisparse.cli:main"

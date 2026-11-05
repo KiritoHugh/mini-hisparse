@@ -1,0 +1,78 @@
+{
+  "device": "cpu",
+  "source": "constructed tables; real resolve_rows execution, no KV gather",
+  "page_size": 4,
+  "logical_tokens": [
+    9,
+    2,
+    6,
+    9,
+    14,
+    -1
+  ],
+  "source_table": [
+    5,
+    2,
+    9,
+    4
+  ],
+  "resident_table": [
+    -1,
+    7,
+    -1,
+    3
+  ],
+  "hot_block_table": [
+    6,
+    1
+  ],
+  "tags_before": [
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    22,
+    -1,
+    -1
+  ],
+  "tags_after": [
+    37,
+    -1,
+    -1,
+    -1,
+    -1,
+    22,
+    -1,
+    -1
+  ],
+  "physical_rows": [
+    24,
+    5,
+    30,
+    -1,
+    14,
+    -1
+  ],
+  "miss_host_rows": [
+    37,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1
+  ],
+  "miss_device_rows": [
+    24,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1
+  ],
+  "counts": {
+    "resident_hits": 2,
+    "hot_hits": 1,
+    "misses": 1
+  }
+}

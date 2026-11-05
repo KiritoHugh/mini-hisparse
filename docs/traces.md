@@ -1,5 +1,7 @@
 # Trace 的含义、格式和局限
 
+首次阅读先看 [图解设计](visual-guide.md)；当前三种 baseline 的测量协议、图表和复现命令集中在 [benchmarks.md](benchmarks.md)。本页是数据格式与选择语义的参考。
+
 ## 已实际验证的数据
 
 `scripts/prepare_longbench.py` 从官方 `zai-org/LongBench` 的固定 revision `5e628be450b7e67fb7ae6e201bd6d8f7056f7672` 下载 archive，seed=42，选择 qasper:163、gov_report:163、repobench-p:327。原始 context 分别为 2,733 / 4,372 / 7,477 个 Qwen tokenizer tokens。

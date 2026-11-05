@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Organize documentation into illustrated design, code walkthrough, runnable examples and current baseline comparisons.
+- Add executable address translation and local-document Qwen examples; include the CPU address example in CI.
+- Extend frozen-trace comparisons with an all-resident control, rotating repeat order and provenance; publish current two-tail A100 reports and a reproducible SVG plot.
+- Keep plotting dependencies optional and include examples/diagram assets in source distributions.
+
 ## 0.2.0
 
 - Replace `HybridKVCache(PagedKVCache)` inheritance with explicit `HostStore` and `DeviceAllocator` composition.

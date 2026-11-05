@@ -1,7 +1,14 @@
-"""Compare page vs token-row storage at identical capacity and frozen selections."""
+"""Compare frozen selections with bounded page/row caches and a resident control."""
 
 import argparse
+import hashlib
 import json
+import subprocess
+import sys
+from collections import Counter
+from dataclasses import replace
+from datetime import datetime, timezone
+from math import ceil
 from pathlib import Path
 from statistics import median
 
@@ -25,6 +32,7 @@ def main():
     parser.add_argument("--gpu-pages", type=int)
     parser.add_argument("--repeats", type=int, default=2)
     parser.add_argument("--device", default="cuda:0")
+    parser.add_argument("--include-resident", action="store_true")
     args = parser.parse_args()
     if args.repeats < 1:
         parser.error("repeats must be positive")
@@ -44,15 +52,41 @@ def main():
         dtype=k.dtype,
         device=args.device,
     )
+    appended = Counter((e["request"], e["layer"]) for e in events)
+    full_pages = sum(
+        ceil((len(p["k"]) + appended[p["request"], p["layer"]]) / config.page_size)
+        for p in trace["prefills"]
+    )
+    layouts = ["resident", "pages", "hybrid"] if args.include_resident else ["pages", "hybrid"]
+    collected = {layout: [] for layout in layouts}
+    orders = []
+    for repeat in range(args.repeats):
+        order = layouts[repeat % len(layouts) :] + layouts[: repeat % len(layouts)]
+        orders.append(order)
+        for layout in order:
+            run_config = replace(config, gpu_pages=full_pages) if layout == "resident" else config
+            result = replay(trace, events, run_config, hot if layout == "hybrid" else None)
+            if layout == "resident":
+                assert result["stats"].get("h2d_bytes", 0) == 0, "resident control must not reload"
+            collected[layout].append(result)
+            print(
+                f"repeat={repeat + 1} layout={layout} median_ms={result['median_layer_step_ms']:.3f}",
+                flush=True,
+            )
     cases = []
-    for layout in ("pages", "hybrid"):
-        runs = [
-            replay(trace, events, config, hot if layout == "hybrid" else None)
-            for _ in range(args.repeats)
-        ]
+    for layout, runs in collected.items():
+        times = [r["median_layer_step_ms"] for r in runs]
         summary = {
             "layout": layout,
-            "median_of_run_medians_ms": median(r["median_layer_step_ms"] for r in runs),
+            "gpu_pages": full_pages if layout == "resident" else capacity,
+            "kv_pool_bytes": (full_pages if layout == "resident" else capacity)
+            * config.page_size
+            * 2
+            * k.shape[1]
+            * k.shape[2]
+            * k.element_size(),
+            "median_of_run_medians_ms": median(times),
+            "run_median_range_ms": [min(times), max(times)],
             "h2d_bytes": (
                 runs[-1]["row_stats"]["h2d_bytes"]
                 if layout == "hybrid"
@@ -64,8 +98,22 @@ def main():
         print(json.dumps(summary), flush=True)
         cases.append({**summary, "runs": runs})
     report = {
+        "recorded_at_utc": datetime.now(timezone.utc).isoformat(),
+        "runtime_commit": subprocess.check_output(
+            ["git", "log", "-1", "--format=%H", "--", "mini_hisparse", "reference", "experiments"],
+            text=True,
+        ).strip(),
+        "comparison_script_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+        "command": ["python", "scripts/compare_layouts.py", *sys.argv[1:]],
         "trace": str(args.trace),
-        "provenance": trace["provenance"],
+        "trace_sha256": hashlib.sha256(args.trace.read_bytes()).hexdigest(),
+        "provenance": {
+            **trace["provenance"],
+            "samples": [
+                {k: v for k, v in sample.items() if k not in ("prompt_ids", "generated_ids")}
+                for sample in trace["provenance"].get("samples", [])
+            ],
+        },
         "selector": args.selector,
         "selection_budget": args.budget,
         "selection_note": "frozen Qwen activation selection; oracle_token is an offline quality oracle, not a learned DSA indexer",
@@ -75,6 +123,14 @@ def main():
         "hot_rows_per_layer": hot.hot_rows,
         "mean_union_rows": sum(unions) / len(unions),
         "repeats": args.repeats,
+        "run_orders": orders,
+        "events_per_run": len(events),
+        "page_size": config.page_size,
+        "kv_heads": config.kv_heads,
+        "head_dim": config.head_dim,
+        "dtype": str(config.dtype),
+        "resident_control": "same selected attention via page reference with all history resident; extra KV memory, not dense attention or an optimized lower bound",
+        "timing_scope": "serialized synchronized layer append + cache resolution/load + selected attention; prefill, JIT warmup, selection and oracle excluded; not end-to-end serving",
         "torch": str(torch.__version__),
         "gpu": torch.cuda.get_device_name(args.device) if args.device.startswith("cuda") else None,
         "cases": cases,

@@ -6,9 +6,11 @@
 
 ## 建议的五分钟演示
 
+配套：[图解设计](visual-guide.md)、[代码调用链](code-walkthrough.md)、[可运行例子](examples.md)、[当前 baseline 图表](benchmarks.md)。
+
 1. 运行 `python -m mini_hisparse demo --device cuda:0 --top-k 2 --prompt-tokens 257 --gpu-pages 12`。展示请求依次准入、持续生成，prefill 始终一次。
 2. 打开 `hybrid.py`：解释 hot credit、实际 hot blocks、active tail、唯一 slab 和 slot fence。
-3. 打开 `row_index.py`：沿 source/resident table → hot tags/LRU → physical row 讲清寻址；全部 hit 先受保护，miss 才选择 victim。
+3. 运行 `python examples/inspect_indices.py`，再打开 `row_index.py`：沿 source/resident table → hot tags/LRU → physical row 讲清寻址；全部 hit 先受保护，miss 才选择 victim。
 4. 打开 `row_kernels.py`：展示从 pinned host 仅搬 miss rows，attention 直接读取物理行；resolver 独立 CUDA Graph 测试与整引擎 Graph 是两回事。
 5. 展示同轨迹 `compare_layouts.py` 结果和真实权重 `validate_pretrained.py --force-host`。说明固定 hot region 的空间代价及 Quest 与 learned DSA 的区别。页级分窗版本作为额外对照。
 

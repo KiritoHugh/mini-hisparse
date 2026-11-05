@@ -2,6 +2,8 @@
 
 The default `hybrid` path separates **logical KV history**, **physical block ownership**, and **hot row contents**. The optional page-based reference has its own [design](page-cache.md).
 
+For a worked address example, state diagrams and a stream sequence diagram, start with the [illustrated guide](visual-guide.md). The [code walkthrough](code-walkthrough.md) maps each operation to its implementation; [examples](examples.md) exercise those paths.
+
 ## Components and dependency direction
 
 ```mermaid
