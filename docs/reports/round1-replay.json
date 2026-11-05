@@ -1,0 +1,56 @@
+{
+  "events": 96,
+  "selection_source": "quest",
+  "median_layer_step_ms": 2.7858749963343143,
+  "max_storage_abs_error": 0.001953125,
+  "per_request": {
+    "qasper:163": {
+      "evictions": 285,
+      "misses": 281,
+      "h2d_bytes": 2293760,
+      "d2h_bytes": 16384,
+      "prefetch_windows": 63,
+      "attention_windows": 95,
+      "resident_hits": 72
+    },
+    "gov_report:163": {
+      "evictions": 284,
+      "peak_device_pages": 32,
+      "misses": 280,
+      "h2d_bytes": 2285568,
+      "d2h_bytes": 16384,
+      "prefetch_windows": 63,
+      "attention_windows": 95,
+      "resident_hits": 69
+    },
+    "repobench-p:327": {
+      "evictions": 278,
+      "misses": 274,
+      "h2d_bytes": 2238464,
+      "d2h_bytes": 16384,
+      "prefetch_windows": 62,
+      "attention_windows": 94,
+      "resident_hits": 81
+    }
+  },
+  "timing_scope": "serialized layer append+attention; selection/oracle excluded; not serving throughput",
+  "budget_pages": 32,
+  "allocated_device_bytes": 262144,
+  "allocated_host_bytes": 6193152,
+  "index_bytes": 1161216,
+  "locations": {
+    "host": 724,
+    "resident": 24,
+    "hot": 8
+  },
+  "stats": {
+    "evictions": 847,
+    "peak_device_pages": 32,
+    "misses": 835,
+    "h2d_bytes": 6817792,
+    "d2h_bytes": 49152,
+    "prefetch_windows": 188,
+    "attention_windows": 284,
+    "resident_hits": 222
+  }
+}

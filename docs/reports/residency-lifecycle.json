@@ -1,0 +1,409 @@
+{
+  "device": "cuda:0",
+  "source_commit": "abf98672ce7e822701f7a062bf240efb2c9900d1",
+  "all_attention_outputs_match": true,
+  "stages": [
+    {
+      "stage": "clean_pinned",
+      "page": {
+        "location": "resident",
+        "loading": false,
+        "backup_pending": false,
+        "content_version": 1,
+        "host_committed_version": 1,
+        "sealed": true,
+        "request_generation": 0,
+        "slot_generation": 1,
+        "allocation_pinned": true,
+        "residency": "clean_pinned"
+      },
+      "original_slot": 0,
+      "current_slot_owner": [
+        "a",
+        0,
+        0
+      ],
+      "current_slot_generation": 1,
+      "budget_pages": 7,
+      "allocated_device_bytes": 1792,
+      "allocated_host_bytes": 16384,
+      "index_bytes": 1768,
+      "index_budget_bytes": 67108864,
+      "host_materialized_pages": 3,
+      "host_unused_credits": 13,
+      "host_available_credits": 48,
+      "retiring_requests": 0,
+      "eviction_policy": "resident-reclaim + per-layer row-LRU",
+      "request_device_pages": {
+        "a": 3
+      },
+      "locations": {
+        "resident": 3
+      },
+      "stats": {
+        "materialized_pages": 3,
+        "peak_device_pages": 3,
+        "d2h_bytes": 768,
+        "host_mirror_completions": 3
+      },
+      "cache_layout": "hybrid_rows",
+      "max_union_rows": 4,
+      "hot_rows": 4,
+      "active_tail_pages": 2,
+      "resident_window_pages": 64,
+      "transition_watermark": 0,
+      "empty_device_blocks": 4,
+      "readable_unpinned_blocks": 0,
+      "allocatable_device_blocks": 4,
+      "pending_clean_pages": 0,
+      "hot_pending_groups": 0,
+      "hot_leased_blocks": 0,
+      "admission_block_credits": 6,
+      "row_stats": {
+        "resident_hits": 0,
+        "hot_hits": 0,
+        "misses": 0,
+        "h2d_bytes": 0
+      }
+    },
+    {
+      "stage": "unpinned_but_readable",
+      "page": {
+        "location": "resident",
+        "loading": false,
+        "backup_pending": false,
+        "content_version": 1,
+        "host_committed_version": 1,
+        "sealed": true,
+        "request_generation": 0,
+        "slot_generation": 1,
+        "allocation_pinned": false,
+        "residency": "clean_unpinned"
+      },
+      "original_slot": 0,
+      "current_slot_owner": [
+        "a",
+        0,
+        0
+      ],
+      "current_slot_generation": 1,
+      "budget_pages": 7,
+      "allocated_device_bytes": 1792,
+      "allocated_host_bytes": 16384,
+      "index_bytes": 1768,
+      "index_budget_bytes": 67108864,
+      "host_materialized_pages": 3,
+      "host_unused_credits": 13,
+      "host_available_credits": 48,
+      "retiring_requests": 0,
+      "eviction_policy": "resident-reclaim + per-layer row-LRU",
+      "request_device_pages": {
+        "a": 4
+      },
+      "locations": {
+        "resident": 3
+      },
+      "stats": {
+        "materialized_pages": 3,
+        "peak_device_pages": 3,
+        "d2h_bytes": 768,
+        "host_mirror_completions": 3,
+        "hot_trigger_explicit": 1,
+        "hot_region_allocations": 1,
+        "clean_page_unpins": 1
+      },
+      "cache_layout": "hybrid_rows",
+      "max_union_rows": 4,
+      "hot_rows": 4,
+      "active_tail_pages": 2,
+      "resident_window_pages": 64,
+      "transition_watermark": 0,
+      "empty_device_blocks": 3,
+      "readable_unpinned_blocks": 1,
+      "allocatable_device_blocks": 4,
+      "pending_clean_pages": 0,
+      "hot_pending_groups": 0,
+      "hot_leased_blocks": 1,
+      "admission_block_credits": 6,
+      "row_stats": {
+        "resident_hits": 0,
+        "hot_hits": 0,
+        "misses": 0,
+        "h2d_bytes": 0
+      }
+    },
+    {
+      "stage": "resident_hit_after_unpin",
+      "page": {
+        "location": "resident",
+        "loading": false,
+        "backup_pending": false,
+        "content_version": 1,
+        "host_committed_version": 1,
+        "sealed": true,
+        "request_generation": 0,
+        "slot_generation": 1,
+        "allocation_pinned": false,
+        "residency": "clean_unpinned"
+      },
+      "original_slot": 0,
+      "current_slot_owner": [
+        "a",
+        0,
+        0
+      ],
+      "current_slot_generation": 1,
+      "budget_pages": 7,
+      "allocated_device_bytes": 1792,
+      "allocated_host_bytes": 16384,
+      "index_bytes": 1768,
+      "index_budget_bytes": 67108864,
+      "host_materialized_pages": 3,
+      "host_unused_credits": 13,
+      "host_available_credits": 48,
+      "retiring_requests": 0,
+      "eviction_policy": "resident-reclaim + per-layer row-LRU",
+      "request_device_pages": {
+        "a": 4
+      },
+      "locations": {
+        "resident": 3
+      },
+      "stats": {
+        "materialized_pages": 3,
+        "peak_device_pages": 3,
+        "d2h_bytes": 768,
+        "host_mirror_completions": 3,
+        "hot_trigger_explicit": 1,
+        "hot_region_allocations": 1,
+        "clean_page_unpins": 1
+      },
+      "cache_layout": "hybrid_rows",
+      "max_union_rows": 4,
+      "hot_rows": 4,
+      "active_tail_pages": 2,
+      "resident_window_pages": 64,
+      "transition_watermark": 0,
+      "empty_device_blocks": 3,
+      "readable_unpinned_blocks": 1,
+      "allocatable_device_blocks": 4,
+      "pending_clean_pages": 0,
+      "hot_pending_groups": 0,
+      "hot_leased_blocks": 1,
+      "admission_block_credits": 6,
+      "row_stats": {
+        "resident_hits": 1,
+        "hot_hits": 0,
+        "misses": 0,
+        "h2d_bytes": 0
+      }
+    },
+    {
+      "stage": "unused_blocks_consumed_first",
+      "page": {
+        "location": "resident",
+        "loading": false,
+        "backup_pending": false,
+        "content_version": 1,
+        "host_committed_version": 1,
+        "sealed": true,
+        "request_generation": 0,
+        "slot_generation": 1,
+        "allocation_pinned": false,
+        "residency": "clean_unpinned"
+      },
+      "original_slot": 0,
+      "current_slot_owner": [
+        "a",
+        0,
+        0
+      ],
+      "current_slot_generation": 1,
+      "budget_pages": 7,
+      "allocated_device_bytes": 1792,
+      "allocated_host_bytes": 16384,
+      "index_bytes": 1768,
+      "index_budget_bytes": 67108864,
+      "host_materialized_pages": 6,
+      "host_unused_credits": 10,
+      "host_available_credits": 48,
+      "retiring_requests": 0,
+      "eviction_policy": "resident-reclaim + per-layer row-LRU",
+      "request_device_pages": {
+        "a": 4,
+        "b": 3
+      },
+      "locations": {
+        "resident": 6
+      },
+      "stats": {
+        "materialized_pages": 6,
+        "peak_device_pages": 7,
+        "d2h_bytes": 1536,
+        "host_mirror_completions": 6,
+        "hot_trigger_explicit": 1,
+        "hot_region_allocations": 1,
+        "clean_page_unpins": 1
+      },
+      "cache_layout": "hybrid_rows",
+      "max_union_rows": 4,
+      "hot_rows": 4,
+      "active_tail_pages": 2,
+      "resident_window_pages": 64,
+      "transition_watermark": 0,
+      "empty_device_blocks": 0,
+      "readable_unpinned_blocks": 1,
+      "allocatable_device_blocks": 1,
+      "pending_clean_pages": 0,
+      "hot_pending_groups": 0,
+      "hot_leased_blocks": 1,
+      "admission_block_credits": 6,
+      "row_stats": {
+        "resident_hits": 1,
+        "hot_hits": 0,
+        "misses": 0,
+        "h2d_bytes": 0
+      }
+    },
+    {
+      "stage": "block_reused_mapping_revoked",
+      "page": {
+        "location": "host",
+        "loading": false,
+        "backup_pending": false,
+        "content_version": 1,
+        "host_committed_version": 1,
+        "sealed": true,
+        "request_generation": 0,
+        "slot_generation": null,
+        "allocation_pinned": false,
+        "residency": "host_only"
+      },
+      "original_slot": 0,
+      "current_slot_owner": [
+        "b",
+        0,
+        3
+      ],
+      "current_slot_generation": 2,
+      "budget_pages": 7,
+      "allocated_device_bytes": 1792,
+      "allocated_host_bytes": 16384,
+      "index_bytes": 1768,
+      "index_budget_bytes": 67108864,
+      "host_materialized_pages": 7,
+      "host_unused_credits": 9,
+      "host_available_credits": 48,
+      "retiring_requests": 0,
+      "eviction_policy": "resident-reclaim + per-layer row-LRU",
+      "request_device_pages": {
+        "a": 3,
+        "b": 4
+      },
+      "locations": {
+        "host": 1,
+        "resident": 6
+      },
+      "stats": {
+        "materialized_pages": 7,
+        "peak_device_pages": 7,
+        "d2h_bytes": 1600,
+        "host_mirror_completions": 7,
+        "hot_trigger_explicit": 1,
+        "hot_region_allocations": 1,
+        "clean_page_unpins": 1,
+        "evictions": 1,
+        "unpinned_block_reuses": 1
+      },
+      "cache_layout": "hybrid_rows",
+      "max_union_rows": 4,
+      "hot_rows": 4,
+      "active_tail_pages": 2,
+      "resident_window_pages": 64,
+      "transition_watermark": 0,
+      "empty_device_blocks": 0,
+      "readable_unpinned_blocks": 0,
+      "allocatable_device_blocks": 0,
+      "pending_clean_pages": 0,
+      "hot_pending_groups": 0,
+      "hot_leased_blocks": 1,
+      "admission_block_credits": 6,
+      "row_stats": {
+        "resident_hits": 1,
+        "hot_hits": 0,
+        "misses": 0,
+        "h2d_bytes": 0
+      }
+    },
+    {
+      "stage": "host_row_loaded_after_real_reuse",
+      "page": {
+        "location": "host",
+        "loading": false,
+        "backup_pending": false,
+        "content_version": 1,
+        "host_committed_version": 1,
+        "sealed": true,
+        "request_generation": 0,
+        "slot_generation": null,
+        "allocation_pinned": false,
+        "residency": "host_only"
+      },
+      "original_slot": 0,
+      "current_slot_owner": [
+        "b",
+        0,
+        3
+      ],
+      "current_slot_generation": 2,
+      "budget_pages": 7,
+      "allocated_device_bytes": 1792,
+      "allocated_host_bytes": 16384,
+      "index_bytes": 1768,
+      "index_budget_bytes": 67108864,
+      "host_materialized_pages": 7,
+      "host_unused_credits": 9,
+      "host_available_credits": 48,
+      "retiring_requests": 0,
+      "eviction_policy": "resident-reclaim + per-layer row-LRU",
+      "request_device_pages": {
+        "a": 3,
+        "b": 4
+      },
+      "locations": {
+        "host": 1,
+        "resident": 6
+      },
+      "stats": {
+        "materialized_pages": 7,
+        "peak_device_pages": 7,
+        "d2h_bytes": 1600,
+        "host_mirror_completions": 7,
+        "hot_trigger_explicit": 1,
+        "hot_region_allocations": 1,
+        "clean_page_unpins": 1,
+        "evictions": 1,
+        "unpinned_block_reuses": 1
+      },
+      "cache_layout": "hybrid_rows",
+      "max_union_rows": 4,
+      "hot_rows": 4,
+      "active_tail_pages": 2,
+      "resident_window_pages": 64,
+      "transition_watermark": 0,
+      "empty_device_blocks": 0,
+      "readable_unpinned_blocks": 0,
+      "allocatable_device_blocks": 0,
+      "pending_clean_pages": 0,
+      "hot_pending_groups": 0,
+      "hot_leased_blocks": 1,
+      "admission_block_credits": 6,
+      "row_stats": {
+        "resident_hits": 1,
+        "hot_hits": 0,
+        "misses": 1,
+        "h2d_bytes": 64
+      }
+    }
+  ]
+}

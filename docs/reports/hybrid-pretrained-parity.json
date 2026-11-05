@@ -1,0 +1,48 @@
+{
+  "model": "Qwen/Qwen2.5-0.5B-Instruct",
+  "selection": "full attention",
+  "dtype": "bfloat16",
+  "generated_tokens": 32,
+  "exact_token_match": true,
+  "prefill_count": 1,
+  "decode_count": 31,
+  "forced_host_history": true,
+  "text": "在大语言模型逐token解码时，缓存attention的Key和Value是为了提高模型的效率和性能。Key和Value分别代表了模型",
+  "reference_text": "在大语言模型逐token解码时，缓存attention的Key和Value是为了提高模型的效率和性能。Key和Value分别代表了模型",
+  "budget_pages": 288,
+  "allocated_device_bytes": 2359296,
+  "allocated_host_bytes": 8388608,
+  "index_bytes": 0,
+  "index_budget_bytes": 67108864,
+  "host_materialized_pages": 0,
+  "host_unused_credits": 0,
+  "host_available_credits": 1024,
+  "retiring_requests": 0,
+  "eviction_policy": "resident-reclaim + per-layer row-LRU",
+  "request_device_pages": {
+    "a": 0
+  },
+  "locations": {},
+  "stats": {
+    "materialized_pages": 144,
+    "peak_device_pages": 288,
+    "d2h_bytes": 1019904,
+    "resident_hits": 696,
+    "append_resident_hits": 696,
+    "hot_region_allocations": 24,
+    "evictions": 144,
+    "retired_requests": 1,
+    "reclaimed_requests": 1
+  },
+  "cache_layout": "hybrid_rows",
+  "max_union_rows": 84,
+  "hot_rows": 168,
+  "hot_leased_blocks": 0,
+  "admission_block_credits": 0,
+  "row_stats": {
+    "resident_hits": 7584,
+    "hot_hits": 41088,
+    "misses": 1920,
+    "h2d_bytes": 983040
+  }
+}

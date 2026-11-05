@@ -1,0 +1,26 @@
+{
+  "model": "Qwen/Qwen2.5-0.5B-Instruct",
+  "selection": "full attention",
+  "dtype": "bfloat16",
+  "generated_tokens": 32,
+  "exact_token_match": true,
+  "prefill_count": 1,
+  "decode_count": 31,
+  "text": "在大语言模型逐token解码时，缓存attention的Key和Value是为了提高模型的效率和性能。Key和Value分别代表了模型",
+  "reference_text": "在大语言模型逐token解码时，缓存attention的Key和Value是为了提高模型的效率和性能。Key和Value分别代表了模型",
+  "budget_pages": 8,
+  "allocated_device_bytes": 65536,
+  "allocated_host_bytes": 8388608,
+  "index_bytes": 0,
+  "locations": {},
+  "stats": {
+    "peak_device_pages": 8,
+    "d2h_bytes": 1019904,
+    "evictions": 3592,
+    "misses": 3456,
+    "h2d_bytes": 25522176,
+    "resident_hits": 744,
+    "attention_windows": 1200,
+    "prefetch_windows": 456
+  }
+}

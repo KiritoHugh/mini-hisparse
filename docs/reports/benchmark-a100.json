@@ -1,0 +1,91 @@
+{
+  "workload": {
+    "tokens": 1024,
+    "steps": 20,
+    "requests": 3,
+    "selected_pages": 8,
+    "page_size": 16,
+    "chunk_pages": 2,
+    "backend": "auto",
+    "dtype": "torch.float32",
+    "device": "cuda:0",
+    "gpu": "NVIDIA A100-SXM4-40GB",
+    "torch": "2.15.0+cu132",
+    "seed": 42,
+    "timing": "append + fixed-selection attention; oracle and input preparation excluded",
+    "profiled_overlap": false
+  },
+  "results": [
+    {
+      "mode": "resident",
+      "median_step_ms": 3.863151534460485,
+      "p95_step_ms": 3.9885148871690035,
+      "request_steps_per_second": 763.1462350055208,
+      "max_abs_error": 4.172325134277344e-07,
+      "budget_pages": 198,
+      "allocated_device_bytes": 1622016,
+      "allocated_host_bytes": 33554432,
+      "index_bytes": 50688,
+      "locations": {
+        "resident": 198
+      },
+      "stats": {
+        "peak_device_pages": 198,
+        "d2h_bytes": 30720,
+        "resident_hits": 534,
+        "attention_windows": 240
+      }
+    },
+    {
+      "mode": "pressured_serial",
+      "median_step_ms": 5.487833055667579,
+      "p95_step_ms": 6.766583072021604,
+      "request_steps_per_second": 512.5692254872841,
+      "max_abs_error": 4.172325134277344e-07,
+      "budget_pages": 8,
+      "allocated_device_bytes": 65536,
+      "allocated_host_bytes": 33554432,
+      "index_bytes": 50688,
+      "locations": {
+        "host": 190,
+        "resident": 6,
+        "hot": 2
+      },
+      "stats": {
+        "evictions": 426,
+        "peak_device_pages": 8,
+        "d2h_bytes": 30720,
+        "resident_hits": 114,
+        "misses": 420,
+        "h2d_bytes": 3440640,
+        "attention_windows": 240
+      }
+    },
+    {
+      "mode": "pressured_overlap",
+      "median_step_ms": 5.421628942713141,
+      "p95_step_ms": 5.5099171586334705,
+      "request_steps_per_second": 552.5215001860685,
+      "max_abs_error": 4.172325134277344e-07,
+      "budget_pages": 8,
+      "allocated_device_bytes": 65536,
+      "allocated_host_bytes": 33554432,
+      "index_bytes": 50688,
+      "locations": {
+        "host": 190,
+        "resident": 4,
+        "hot": 4
+      },
+      "stats": {
+        "evictions": 426,
+        "peak_device_pages": 8,
+        "d2h_bytes": 30720,
+        "resident_hits": 114,
+        "misses": 420,
+        "h2d_bytes": 3440640,
+        "prefetch_windows": 180,
+        "attention_windows": 240
+      }
+    }
+  ]
+}

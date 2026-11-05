@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mini-hisparse"
+version = "0.1.0"
+description = "A readable, single-GPU inference engine for decoding with partially resident KV caches"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.10"
+keywords = ["llm", "inference", "kv-cache", "sparse-attention", "triton"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = ["torch>=2.5"]
+
+[project.urls]
+Homepage = "https://github.com/qzhou77/mini-hisparse"
+Repository = "https://github.com/qzhou77/mini-hisparse"
+Issues = "https://github.com/qzhou77/mini-hisparse/issues"
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "ruff>=0.9", "build>=1.2"]
+models = ["transformers>=4.46,<6", "safetensors", "huggingface-hub"]
+
+[project.scripts]
+mini-hisparse = "mini_hisparse.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["mini_hisparse*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["cuda: requires a CUDA GPU"]
+
+[tool.ruff]
+line-length = 100
+

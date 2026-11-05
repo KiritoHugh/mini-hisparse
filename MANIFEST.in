@@ -1,0 +1,4 @@
+include README.zh-CN.md CONTRIBUTING.md requirements-tested.txt
+recursive-include docs *.md *.json
+recursive-include scripts *.py *.sh
+recursive-include tests *.py

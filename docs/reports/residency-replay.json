@@ -1,0 +1,98 @@
+{
+  "events": 96,
+  "selection_source": "quest",
+  "median_layer_step_ms": 2.847106894478202,
+  "max_storage_abs_error": 0.001953125,
+  "per_request": {
+    "qasper:163": {
+      "resident_hits": 28,
+      "append_resident_hits": 28,
+      "d2h_bytes": 16384,
+      "host_mirror_completions": 32,
+      "row_resident_hits": 784,
+      "row_hot_hits": 2960,
+      "row_misses": 1216,
+      "materialized_pages": 4,
+      "clean_page_unpins": 4,
+      "evictions": 4,
+      "unpinned_block_reuses": 4
+    },
+    "gov_report:163": {
+      "resident_hits": 28,
+      "append_resident_hits": 28,
+      "d2h_bytes": 16384,
+      "host_mirror_completions": 32,
+      "row_resident_hits": 784,
+      "row_hot_hits": 2864,
+      "row_misses": 1248,
+      "materialized_pages": 4,
+      "clean_page_unpins": 4,
+      "evictions": 4,
+      "unpinned_block_reuses": 4,
+      "peak_device_pages": 384
+    },
+    "repobench-p:327": {
+      "resident_hits": 28,
+      "append_resident_hits": 28,
+      "d2h_bytes": 16384,
+      "host_mirror_completions": 32,
+      "row_resident_hits": 752,
+      "row_hot_hits": 3008,
+      "row_misses": 1232,
+      "materialized_pages": 4,
+      "clean_page_unpins": 4,
+      "evictions": 4,
+      "unpinned_block_reuses": 4
+    }
+  },
+  "timing_scope": "serialized layer append+attention; selection/oracle excluded; not serving throughput",
+  "budget_pages": 384,
+  "allocated_device_bytes": 3145728,
+  "allocated_host_bytes": 6193152,
+  "index_bytes": 850464,
+  "index_budget_bytes": 67108864,
+  "host_materialized_pages": 756,
+  "host_unused_credits": 0,
+  "host_available_credits": 0,
+  "retiring_requests": 0,
+  "eviction_policy": "resident-reclaim + per-layer row-LRU",
+  "request_device_pages": {
+    "qasper:163": 128,
+    "gov_report:163": 128,
+    "repobench-p:327": 128
+  },
+  "locations": {
+    "host": 732,
+    "resident": 24
+  },
+  "stats": {
+    "resident_hits": 84,
+    "append_resident_hits": 84,
+    "d2h_bytes": 49152,
+    "host_mirror_completions": 96,
+    "materialized_pages": 12,
+    "clean_page_unpins": 12,
+    "evictions": 12,
+    "unpinned_block_reuses": 12,
+    "peak_device_pages": 384
+  },
+  "cache_layout": "hybrid_rows",
+  "max_union_rows": 239,
+  "hot_rows": 478,
+  "active_tail_pages": 2,
+  "resident_window_pages": 64,
+  "transition_watermark": 38,
+  "empty_device_blocks": 0,
+  "readable_unpinned_blocks": 0,
+  "allocatable_device_blocks": 0,
+  "pending_clean_pages": 0,
+  "hot_pending_groups": 0,
+  "hot_leased_blocks": 360,
+  "admission_block_credits": 384,
+  "row_stats": {
+    "resident_hits": 2320,
+    "hot_hits": 8832,
+    "misses": 3696,
+    "h2d_bytes": 1892352
+  }
+}
