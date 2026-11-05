@@ -17,7 +17,7 @@
 Python ≥ 3.10，PyTorch ≥ 2.5。CUDA 路径使用随 CUDA PyTorch 安装的 Triton；CPU 路径可验证缓存语义，但不能替代 CUDA 时序和 kernel 检查。
 
 ```bash
-git clone https://github.com/qzhou77/mini-hisparse.git
+git clone https://github.com/KiritoHugh/mini-hisparse.git
 cd mini-hisparse
 python -m venv .venv
 source .venv/bin/activate

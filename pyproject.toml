@@ -21,9 +21,9 @@ classifiers = [
 dependencies = ["torch>=2.5"]
 
 [project.urls]
-Homepage = "https://github.com/qzhou77/mini-hisparse"
-Repository = "https://github.com/qzhou77/mini-hisparse"
-Issues = "https://github.com/qzhou77/mini-hisparse/issues"
+Homepage = "https://github.com/KiritoHugh/mini-hisparse"
+Repository = "https://github.com/KiritoHugh/mini-hisparse"
+Issues = "https://github.com/KiritoHugh/mini-hisparse/issues"
 
 [project.optional-dependencies]
 dev = ["pytest>=8", "ruff>=0.9", "build>=1.2"]

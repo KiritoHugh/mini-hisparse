@@ -35,7 +35,7 @@ flowchart LR
 Python 3.10+ is required. A CPU is sufficient for the mechanics demo and reference tests.
 
 ```bash
-git clone https://github.com/qzhou77/mini-hisparse.git
+git clone https://github.com/KiritoHugh/mini-hisparse.git
 cd mini-hisparse
 python -m venv .venv
 source .venv/bin/activate
