@@ -7,25 +7,31 @@
 ## 1. 一个 GPU 池，三种管理粒度
 
 ```mermaid
-flowchart TB
+flowchart LR
     subgraph Control[CPU 控制逻辑]
+        direction TB
         E[Engine 准入与调度] --> C[HybridKVCache 驻留策略]
         C --> A[DeviceAllocator 分配 block]
     end
-    subgraph GPU[GPU]
-        I[常驻小索引和地址表] --> R[逻辑 token 到物理 row]
-        subgraph Slab[唯一 KV tensor]
-            P[Resident blocks：完整逻辑页]
-            H[Hot blocks：来自不同页的 token rows]
+    subgraph Data[GPU / Host 数据路径]
+        direction TB
+        subgraph GPU[GPU]
+            direction TB
+            I[常驻小索引和地址表] --> R[逻辑 token 到物理 row]
+            subgraph Slab[唯一 KV tensor]
+                P[Resident blocks：完整逻辑页]
+                H[Hot blocks：来自不同页的 token rows]
+            end
+            R -->|resident hit| P
+            R -->|hot hit 或 miss 落点| H
+            P --> AT[Physical-row attention]
+            H --> AT
         end
-        R -->|resident hit| P
-        R -->|hot hit 或 miss 落点| H
-        P --> AT[Physical-row attention]
-        H --> AT
+        P -->|新增 KV 的 D2H 镜像| Host[Host 完整逻辑历史]
+        Host -->|仅 gather 缺失 rows| H
     end
-    A --> Slab
-    P -->|新增 KV 的 D2H 镜像| Host[Host 完整逻辑历史]
-    Host -->|仅 gather 缺失 rows| H
+    %% 连接外层分组，避免跨组节点连线覆盖组内的纵向布局。
+    Control -->|分配 GPU blocks| Data
 ```
 
 | 概念 | 举例 | 生命周期与用途 |
