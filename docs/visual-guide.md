@@ -155,7 +155,7 @@ flowchart TB
 例如 tiny demo 中 `L=2, P=16, U=32, H=64`：每层 4 hot blocks + 2 tails，每请求至少 12 blocks。准入预留的是**容量 credit**，并非开始就把 8 个 hot blocks 从池里拿走；未用 credit 可被 resident history 借用。
 
 ```mermaid
-flowchart TD
+flowchart LR
     A[新请求] --> B{host / index / hot+tail credits 足够?}
     B -->|否| W[等待准入]
     B -->|是| R[准入：history 先驻留]
