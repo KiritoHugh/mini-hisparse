@@ -2,7 +2,7 @@
 
 从 [项目介绍](../README.zh-CN.md) 或 [English README](../README.md) 开始。中文教程按设计 → 代码 → 运行 → 测评组织；[Architecture](design.md) 和 [Validation](validation.md) 提供英文概览。
 
-**独立面试答卷：[在线设计文档](partial-residency-design.md) · [PDF 版本](partial-residency-design.pdf)。** 从约束、页状态、共享池配额到 decode 时序与效率优化自成体系，包含六张图和短伪代码，无需先阅读项目文档。
+**独立面试答卷：[在线设计文档](partial-residency-design.md) · [PDF 版本](partial-residency-design.pdf)。** 从约束、页状态、共享池配额到 decode 时序与效率优化自成体系，以同一容量示例串联七张图和短伪代码，无需先阅读项目文档。
 
 ## 第一次阅读：按这条路线
 

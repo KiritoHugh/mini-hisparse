@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="256" viewBox="0 0 900 256" role="img" aria-labelledby="title desc">
+<title id="title">本步四个逻辑token的物理落点</title>
+<desc id="desc">t0 hot hit，t5 miss 到 B0 offset1，t9 和 t12 resident hit；最终行号为0、1、9、4。</desc>
+<rect width="900" height="256" fill="white"/>
+<g font-family="Noto Sans CJK SC, sans-serif">
+<rect x="15" y="10" width="195" height="63" rx="7" fill="#e7f3ee" stroke="#76a18f" stroke-width="1.4"/>
+<text x="112.5" y="34.65" text-anchor="middle" font-size="19" font-weight="400" fill="#20344a">t0</text>
+<text x="112.5" y="61.65" text-anchor="middle" font-size="19" font-weight="400" fill="#20344a">Hot hit</text>
+<polyline points="112.5,73 112.5,108" fill="none" stroke="#607184" stroke-width="1.6"/>
+<polygon points="112.5,108 108.5,100.0 116.5,100.0" fill="#607184"/>
+<rect x="15" y="108" width="195" height="44" rx="7" fill="#e7f3ee" stroke="#76a18f" stroke-width="1.4"/>
+<text x="112.5" y="136.3" text-anchor="middle" font-size="18" font-weight="400" fill="#20344a">B0 : 0 → row 0</text>
+<rect x="240" y="10" width="195" height="63" rx="7" fill="#faf1e1" stroke="#c8ab73" stroke-width="1.4"/>
+<text x="337.5" y="34.65" text-anchor="middle" font-size="19" font-weight="400" fill="#20344a">t5</text>
+<text x="337.5" y="61.65" text-anchor="middle" font-size="19" font-weight="400" fill="#20344a">Miss · 加载后</text>
+<polyline points="337.5,73 337.5,108" fill="none" stroke="#607184" stroke-width="1.6"/>
+<polygon points="337.5,108 333.5,100.0 341.5,100.0" fill="#607184"/>
+<rect x="240" y="108" width="195" height="44" rx="7" fill="#faf1e1" stroke="#c8ab73" stroke-width="1.4"/>
+<text x="337.5" y="136.3" text-anchor="middle" font-size="18" font-weight="400" fill="#20344a">B0 : 1 → row 1</text>
+<rect x="465" y="10" width="195" height="63" rx="7" fill="#eaf0f8" stroke="#7d9ab8" stroke-width="1.4"/>
+<text x="562.5" y="34.65" text-anchor="middle" font-size="19" font-weight="400" fill="#20344a">t9</text>
+<text x="562.5" y="61.65" text-anchor="middle" font-size="19" font-weight="400" fill="#20344a">Resident hit</text>
+<polyline points="562.5,73 562.5,108" fill="none" stroke="#607184" stroke-width="1.6"/>
+<polygon points="562.5,108 558.5,100.0 566.5,100.0" fill="#607184"/>
+<rect x="465" y="108" width="195" height="44" rx="7" fill="#eaf0f8" stroke="#7d9ab8" stroke-width="1.4"/>
+<text x="562.5" y="136.3" text-anchor="middle" font-size="18" font-weight="400" fill="#20344a">B2 : 1 → row 9</text>
+<rect x="690" y="10" width="195" height="63" rx="7" fill="#eaf0f8" stroke="#7d9ab8" stroke-width="1.4"/>
+<text x="787.5" y="34.65" text-anchor="middle" font-size="19" font-weight="400" fill="#20344a">t12</text>
+<text x="787.5" y="61.65" text-anchor="middle" font-size="19" font-weight="400" fill="#20344a">Resident hit</text>
+<polyline points="787.5,73 787.5,108" fill="none" stroke="#607184" stroke-width="1.6"/>
+<polygon points="787.5,108 783.5,100.0 791.5,100.0" fill="#607184"/>
+<rect x="690" y="108" width="195" height="44" rx="7" fill="#eaf0f8" stroke="#7d9ab8" stroke-width="1.4"/>
+<text x="787.5" y="136.3" text-anchor="middle" font-size="18" font-weight="400" fill="#20344a">B1 : 0 → row 4</text>
+<text x="15" y="192" text-anchor="start" font-size="19" font-weight="500" fill="#20344a">B0 内容</text>
+<rect x="138" y="170" width="73" height="44" rx="7" fill="#e7f3ee" stroke="#76a18f" stroke-width="1.4"/>
+<text x="174.5" y="198.65" text-anchor="middle" font-size="19" font-weight="400" fill="#20344a">t0</text>
+<rect x="217" y="170" width="73" height="44" rx="7" fill="#e7f3ee" stroke="#76a18f" stroke-width="1.4"/>
+<text x="253.5" y="198.65" text-anchor="middle" font-size="19" font-weight="400" fill="#20344a">t1</text>
+<rect x="296" y="170" width="73" height="44" rx="7" fill="#e7f3ee" stroke="#76a18f" stroke-width="1.4"/>
+<text x="332.5" y="198.65" text-anchor="middle" font-size="19" font-weight="400" fill="#20344a">t2</text>
+<rect x="375" y="170" width="73" height="44" rx="7" fill="#e7f3ee" stroke="#76a18f" stroke-width="1.4"/>
+<text x="411.5" y="198.65" text-anchor="middle" font-size="19" font-weight="400" fill="#20344a">t3</text>
+<rect x="550" y="170" width="73" height="44" rx="7" fill="#e7f3ee" stroke="#76a18f" stroke-width="1.4"/>
+<text x="586.5" y="198.65" text-anchor="middle" font-size="19" font-weight="400" fill="#20344a">t0</text>
+<rect x="629" y="170" width="73" height="44" rx="7" fill="#faf1e1" stroke="#c8ab73" stroke-width="1.4"/>
+<text x="665.5" y="198.65" text-anchor="middle" font-size="19" font-weight="400" fill="#20344a">t5</text>
+<rect x="708" y="170" width="73" height="44" rx="7" fill="#e7f3ee" stroke="#76a18f" stroke-width="1.4"/>
+<text x="744.5" y="198.65" text-anchor="middle" font-size="19" font-weight="400" fill="#20344a">t2</text>
+<rect x="787" y="170" width="73" height="44" rx="7" fill="#e7f3ee" stroke="#76a18f" stroke-width="1.4"/>
+<text x="823.5" y="198.65" text-anchor="middle" font-size="19" font-weight="400" fill="#20344a">t3</text>
+<polyline points="454,192 535,192" fill="none" stroke="#607184" stroke-width="1.6"/>
+<polygon points="535,192 527.0,196.0 527.0,188.0" fill="#607184"/>
+<text x="300" y="245" text-anchor="middle" font-size="18" font-weight="400" fill="#607184">t0 本轮受保护</text>
+<text x="705" y="245" text-anchor="middle" font-size="18" font-weight="400" fill="#607184">只替换 t1；只加载 t5</text>
+</g></svg>

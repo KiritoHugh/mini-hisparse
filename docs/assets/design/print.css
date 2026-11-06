@@ -1,31 +1,54 @@
 @page {
   size: A4;
-  margin: 17mm 17mm 17mm;
-  @top-left { content: "MINI-HISPARSE  /  SYSTEM DESIGN"; font-family: "DejaVu Sans", sans-serif; font-size: 8pt; color: #64748b; }
-  @bottom-left { content: "部分驻留 KV Cache · 设计答卷"; font-family: "Noto Sans CJK SC", sans-serif; font-size: 8pt; color: #64748b; }
-  @bottom-right { content: counter(page) " / " counter(pages); font-family: "DejaVu Sans", sans-serif; font-size: 8pt; color: #64748b; }
+  margin: 18mm 19mm 17mm;
+  @top-left {
+    content: "SYSTEM DESIGN     /     PARTIAL KV RESIDENCY";
+    font-family: "DejaVu Sans", sans-serif;
+    font-size: 7pt;
+    letter-spacing: 0.6pt;
+    color: #718092;
+  }
+  @bottom-left {
+    content: "显存受限下的持续解码";
+    font-family: "Noto Sans CJK SC", sans-serif;
+    font-size: 8pt;
+    color: #718092;
+  }
+  @bottom-right {
+    content: counter(page);
+    font-family: "DejaVu Sans", sans-serif;
+    font-size: 8pt;
+    color: #718092;
+  }
 }
-html { font-family: "Noto Sans CJK SC", sans-serif; font-size: 10pt; line-height: 1.65; color: #1e293b; }
+html {
+  font-family: "Noto Serif CJK SC", serif;
+  font-size: 10.2pt;
+  line-height: 1.78;
+  color: #253449;
+}
 body { margin: 0; }
-h1 { font-size: 23pt; line-height: 1.4; color: #153e56; margin: 1mm 0 4mm; letter-spacing: -0.3pt; }
-h2 { font-size: 16pt; line-height: 1.4; color: #153e56; border-bottom: 1.5pt solid #1c8175; padding-bottom: 2mm; margin: 0 0 4mm; }
-h3 { font-size: 11.5pt; color: #1c6b64; margin: 4mm 0 1.5mm; }
+h1, h2, h3, th { font-family: "Noto Sans CJK SC", sans-serif; }
+h1 { font-size: 25pt; line-height: 1.35; color: #203c55; margin: 0 0 4mm; }
+h2 { font-size: 15.7pt; line-height: 1.45; color: #203c55; margin: 4mm 0 4mm; padding-bottom: 2mm; border-bottom: 0.6pt solid #a4b7c5; }
+h3 { font-size: 11.6pt; line-height: 1.5; color: #264f63; margin: 4mm 0 2mm; }
 h1, h2, h3 { break-after: avoid; }
-p { margin: 2.5mm 0; orphans: 3; widows: 3; }
+p { margin: 2.6mm 0; orphans: 3; widows: 3; }
 strong { font-weight: 700; }
-table { width: 100%; border-collapse: collapse; font-size: 8.8pt; line-height: 1.5; margin: 3mm 0; }
-th { background: #e8f2f3; color: #153e56; font-weight: 700; text-align: left; }
-th, td { padding: 1.7mm 2mm; border: 0.5pt solid #cbd5e1; vertical-align: top; }
+table { width: 100%; border-collapse: collapse; font-family: "Noto Sans CJK SC", sans-serif; font-size: 8.6pt; line-height: 1.6; margin: 3mm 0; }
+th { text-align: left; background: #edf2f6; color: #203c55; border-top: 0.8pt solid #8197ab; }
+th, td { padding: 2mm 2.2mm; border-bottom: 0.45pt solid #ccd5dd; vertical-align: top; }
 tr { break-inside: avoid; }
 thead { display: table-header-group; }
-code { font-family: "DejaVu Sans Mono", "Noto Sans CJK SC", monospace; font-size: 8.7pt; color: #254965; }
-p code, li code, td code { overflow-wrap: anywhere; }
-pre { background: #f0f5f8; border-left: 2.5pt solid #238478; padding: 3mm; margin: 3mm 0; line-height: 1.48; white-space: pre-wrap; overflow-wrap: anywhere; break-inside: avoid; }
-pre code { font-size: 8.5pt; color: #243746; }
-img { display: block; max-width: 100%; max-height: 67mm; width: auto; height: auto; margin: 3mm auto; }
+code { font-family: "DejaVu Sans Mono", "Noto Sans CJK SC", monospace; font-size: 8.4pt; color: #30475e; }
+p code, td code { overflow-wrap: anywhere; }
+pre { background: #f4f6f8; border-left: 2pt solid #8ca3b4; padding: 3mm; margin: 3mm 0; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; break-inside: avoid; }
+pre code { font-size: 8.1pt; }
+img { display: block; width: 100%; height: auto; margin: 3mm auto 2mm; }
 p:has(img) { break-inside: avoid; break-after: avoid; }
-p:has(> em:only-child) { font-size: 8.5pt; color: #526577; line-height: 1.5; margin: 1mm 0 3mm; }
-ol, ul { padding-left: 5.5mm; margin: 2mm 0; }
-li { margin: 1.2mm 0; }
-a { color: #176c79; text-decoration: none; }
+p:has(> em:only-child) { font-family: "Noto Sans CJK SC", sans-serif; font-size: 8.4pt; color: #607184; line-height: 1.6; margin: 1mm 0 3mm; }
+p:has(> em:only-child) em { font-style: normal; }
+a { color: #285d79; text-decoration: none; }
+hr { border: 0; border-top: 0.5pt solid #ccd5dd; margin: 5mm 0 3mm; }
 .pagebreak { break-before: page; }
+.pagebreak + h2, .pagebreak + h3 { margin-top: 0; }

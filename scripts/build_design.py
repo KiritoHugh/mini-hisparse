@@ -1,14 +1,15 @@
 """Build the standalone design PDF and SVG diagrams from versioned sources.
 
-Install .[docs], Graphviz and Noto CJK fonts. Run from any directory:
+Install .[docs], Pango and Noto CJK fonts. Run from any directory:
     python scripts/build_design.py
 """
 
 import argparse
 import re
-import subprocess
 from html import escape
 from pathlib import Path
+
+from design_figures import build_figures
 
 
 def main():
@@ -21,9 +22,7 @@ def main():
     args = parser.parse_args()
     source = root / "docs/partial-residency-design.md"
     assets = root / "docs/assets/design"
-    for diagram in sorted(assets.glob("*.dot")):
-        svg = subprocess.check_output(["dot", "-Tsvg", str(diagram)])
-        diagram.with_suffix(".svg").write_bytes(svg)
+    build_figures(assets)
     markdown = source.read_text(encoding="utf-8")
     markdown = markdown.replace("<!-- pagebreak -->", '<div class="pagebreak"></div>')
     body = MarkdownIt("commonmark", {"html": True}).enable("table").render(markdown)
