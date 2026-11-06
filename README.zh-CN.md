@@ -6,6 +6,8 @@
 
 完整历史保留 host backing；resident pages 与 hot buffers 共享一个 GPU tensor。每步把选中的逻辑 token 解析为 resident row 或 hot slot，只从 host 加载缺失 rows。请求无需恢复全部 KV，仍能继续生成。
 
+**独立面试答卷：[在线设计文档](docs/partial-residency-design.md) · [PDF 版本](docs/partial-residency-design.pdf)。** 自成体系说明约束、页面管理、共享池分配、解码时序与效率优化，附六张图和短伪代码。
+
 项目借鉴 nano-vLLM 的小型引擎组织方式，参考 vLLM / SGLang HiSparse 的生命周期与搬运设计。默认 runtime 只有 hybrid 一条路径，页级实现位于独立 `reference/`，用于显式 baseline 对比。预训练适配支持 Qwen2/2.5 GQA；Quest 是近似选择器，不是 DeepSeek learned DSA indexer。
 
 ## 先看图，再跑代码

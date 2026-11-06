@@ -31,4 +31,13 @@ Record hardware, dtype, page size, hot capacity, selection source and timing sco
 
 Documentation starts at [the reading guide](docs/README.md). Keep mechanism diagrams in Mermaid near the explanation and link them to actual code or a runnable example. Generate benchmark figures from JSON with `python scripts/plot_comparison.py` after installing `.[plots]`; do not hand-edit measured values in the SVG. Keep current two-tail results separate from archived one-tail experiments, and explain any unfavorable result alongside the favorable cases.
 
+The standalone [design answer](docs/partial-residency-design.md) and its [PDF](docs/partial-residency-design.pdf) share one Markdown source. Its static diagrams use versioned Graphviz `.dot` sources in `docs/assets/design/`, so both GitHub and PDF show the same figures. To rebuild, install Graphviz (`dot`), Pango and Noto Sans CJK SC fonts, then run:
+
+```bash
+python -m pip install -e '.[docs]'
+python scripts/build_design.py
+```
+
+Commit the Markdown, diagram sources/generated SVGs, print CSS and regenerated PDF together. The optional `docs` extra is only needed for publishing; it is not part of inference dependencies. Review PDF page breaks, diagram labels and searchable Chinese text after content changes.
+
 Do not commit model weights, dataset contents, tensor traces, credentials or `.references/` checkouts. Reference upstream work using pinned revisions and preserve attribution for any future code reuse. The project uses the MIT license in [LICENSE](LICENSE).

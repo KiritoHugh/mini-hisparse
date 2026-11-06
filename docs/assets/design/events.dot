@@ -1,0 +1,26 @@
+digraph events {
+  graph [rankdir=LR, bgcolor="white", pad=0.15, nodesep=0.3, ranksep=0.32, fontname="Noto Sans CJK SC", fontsize=13];
+  node [shape=box, style="rounded,filled", fillcolor="#E4EAFB", color="#AEBBD7", fontname="Noto Sans CJK SC", fontsize=12, margin="0.12,0.10"];
+  edge [color="#64748B", fontcolor="#475569", fontname="Noto Sans CJK SC", fontsize=10, arrowsize=0.7];
+  subgraph cluster_compute {
+    label="Compute stream"; color="#CAD3E7"; style=rounded;
+    append [label="Append 新 KV"];
+    resolve [label="Resolve 地址\n保护 hits"];
+    attend [label="Attention\n读取全部选择"];
+    done [label="记录 read_done"];
+    append -> resolve; resolve -> attend [style=dotted, label="同流顺序"];
+    attend -> done;
+  }
+  subgraph cluster_transfer {
+    label="Transfer stream"; labelloc=b; color="#93C5BD"; style=rounded;
+    mirror [label="D2H 新增 rows", fillcolor="#DAF3E8"];
+    gather [label="Gather misses\n等待上一轮 read_done", fillcolor="#DAF3E8"];
+    next [label="下一次覆盖 hot", fillcolor="#DAF3E8"];
+    mirror -> gather [label="host 先写后读"];
+    gather -> next [style=dotted];
+  }
+  append -> mirror [label="write_ready"];
+  resolve -> gather [label="resolved"];
+  gather -> attend [label="loaded"];
+  done -> next [label="read_done"];
+}

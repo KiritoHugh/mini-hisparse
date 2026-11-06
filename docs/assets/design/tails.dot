@@ -1,0 +1,16 @@
+digraph tails {
+  graph [rankdir=LR, bgcolor="white", pad=0.12, nodesep=0.22, ranksep=0.35, fontname="Noto Sans CJK SC"];
+  node [shape=plain, fontname="Noto Sans CJK SC", fontsize=12];
+  edge [color="#64748B", fontname="Noto Sans CJK SC", fontsize=11];
+  before [label=<
+    <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="10" COLOR="#B6C6D6">
+      <TR><TD COLSPAN="3" BGCOLOR="#F2F6FA">12 tokens：当前尾页 t = 2</TD></TR>
+      <TR><TD BGCOLOR="#F4F4F5">page 0<BR/>历史候选</TD><TD BGCOLOR="#DFF0FB">page 1<BR/>tail 保护</TD><TD BGCOLOR="#DFF0FB">page 2<BR/>tail 保护</TD></TR>
+    </TABLE>>];
+  after [label=<
+    <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="10" COLOR="#B6C6D6">
+      <TR><TD COLSPAN="4" BGCOLOR="#F2F6FA">13 tokens：当前尾页 t = 3</TD></TR>
+      <TR><TD BGCOLOR="#F4F4F5">page 0<BR/>历史候选</TD><TD BGCOLOR="#FFF0D8">page 1<BR/>新候选</TD><TD BGCOLOR="#DFF0FB">page 2<BR/>仍保护</TD><TD BGCOLOR="#DFF0FB">page 3<BR/>新增一行</TD></TR>
+    </TABLE>>];
+  before -> after [label="追加 token 12"];
+}

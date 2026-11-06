@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Publish a self-contained Chinese design answer with six vector diagrams, pseudocode, a PDF edition and a reproducible Graphviz/WeasyPrint build script.
+
 - Expand the three interview answers with exact page/row state transitions, victim policy, conditional progress reasoning and asynchronous execution limits.
 - Add a fixed-capacity hot-size sweep and recorded A100 results, including infeasible admission configurations; add CPU/CUDA worst-case all-miss progress coverage at the minimum hot/tail footprint.
 

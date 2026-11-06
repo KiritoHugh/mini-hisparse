@@ -1,0 +1,30 @@
+digraph overview {
+  graph [rankdir=LR, bgcolor="white", pad=0.15, nodesep=0.28, ranksep=0.38, fontname="Noto Sans CJK SC", fontsize=14];
+  node [shape=box, style="rounded,filled", fillcolor="#F2F6FA", color="#B6C6D6", fontname="Noto Sans CJK SC", fontsize=12, margin="0.13,0.10"];
+  edge [color="#64748B", fontcolor="#475569", fontname="Noto Sans CJK SC", fontsize=10, arrowsize=0.7];
+  control [label="CPU 控制逻辑\n准入 / 回收 / block 租约\n版本、读者与完成事件"];
+  host [label="Pinned host\n完整 KV backing", fillcolor="#FFF6E8", color="#E4B36A"];
+  {rank=same; control; host;}
+  subgraph cluster_gpu {
+    label="GPU"; color="#67AFA4"; style=rounded;
+    index [label="常驻小索引\n输出逻辑 token IDs"];
+    resolver [label="Row resolver\n命中保护 / miss plan"];
+    subgraph cluster_pool {
+      label="同一个 GPU KV tensor"; color="#93C5BD"; style="rounded,filled"; fillcolor="#F1FAF7";
+      resident [label="Resident blocks\n完整驻留页", fillcolor="#DFF0FB"];
+      hot [label="Hot block leases\n可替换的 token rows", fillcolor="#DAF3E8"];
+      {rank=same; resident; hot;}
+    }
+    attention [label="Attention\n读取物理 rows", fillcolor="#E4EAFB"];
+    {rank=same; index; resolver;}
+    index -> resolver [constraint=false];
+    resolver -> resident [label="驻留命中"];
+    resolver -> hot [label="hot 命中 / miss 落点"];
+    resident -> attention; hot -> attention;
+  }
+  control -> index [style=invis, weight=20];
+  control -> resident [label="同池分配"];
+  control -> hot [style=dashed, label="兑现 hot"];
+  resident -> host [label="新增 KV 镜像", constraint=false];
+  host -> hot [label="只加载 misses"];
+}

@@ -1,0 +1,14 @@
+digraph addressing {
+  graph [rankdir=LR, bgcolor="white", pad=0.15, nodesep=0.22, ranksep=0.35, fontname="Noto Sans CJK SC"];
+  node [shape=box, style="rounded,filled", fillcolor="#F2F6FA", color="#B6C6D6", fontname="Noto Sans CJK SC", fontsize=12, margin="0.14,0.10"];
+  edge [color="#64748B", fontname="Noto Sans CJK SC", fontsize=10, arrowsize=0.7];
+  input [label="选择 tokens\n[1, 2, 5, 10]\nP = 4"];
+  resident [label="驻留命中：token 5、10\npage 1 → GPU block 1\npage 2 → GPU block 2", fillcolor="#DFF0FB"];
+  hit [label="Hot 命中：token 1\npage 0 → host block 5\nhost row 21 → hot slot 3", fillcolor="#DAF3E8"];
+  miss [label="Miss：token 2\nhost row = 5×4+2 = 22\n选空 hot slot 0", fillcolor="#FFF0D8", color="#D9AA63"];
+  out [label="物理 rows\n[3, 0, 5, 10]\n等待唯一 miss 到位后读取"];
+  input -> resident; input -> hit; input -> miss;
+  resident -> out [label="rows 5、10"];
+  hit -> out [label="GPU block 0 / row 3"];
+  miss -> out [label="gather：host 22 → GPU row 0"];
+}

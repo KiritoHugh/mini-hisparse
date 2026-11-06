@@ -8,6 +8,8 @@ The complete KV history has host backing. Resident pages and reusable hot buffer
 
 This is an educational systems project with real PyTorch execution and Triton kernels. The pretrained model adapter supports Qwen2/2.5 GQA; the sparse selector is a Quest-style approximation, not a learned DeepSeek DSA indexer.
 
+**Standalone design answer (Chinese): [read online](docs/partial-residency-design.md) · [PDF](docs/partial-residency-design.pdf).** A self-contained explanation of page states, shared-pool capacity, decode scheduling and asynchronous optimization, with six diagrams and short pseudocode.
+
 **Reading path:** [illustrated design](docs/visual-guide.md) → [code walkthrough](docs/code-walkthrough.md) → [runnable examples](docs/examples.md) → [baseline comparisons](docs/benchmarks.md). These tutorials are in Chinese; [Architecture](docs/design.md) and [Validation](docs/validation.md) provide English references.
 
 The [interview answers and assessment](docs/interview.md) connect page states, shared-pool allocation and asynchronous attention to the code, progress conditions and test evidence. The [hot-capacity study](docs/hot-capacity.md) explains why the default `2U` is a tradeoff rather than a minimum or an optimum.
